@@ -1,380 +1,504 @@
-# Arbitrage Dashboard 需求文档
-
-## 项目路径
-`arbitrage-dashboard`
-
-## 用户系统
-
-### 公开访问（无需登录）
-- 查看所有套利业务数据
-
-### 注册
-- 用户名 + 密码 + 确认密码
-- 密码规则：最少6位，必须包含字母+数字
-
-### 登录
-- 用户名 + 密码
-- 7天免登录
-
-### 登录后功能
-- 配置个人预警/提醒
-- 主题切换（亮色/暗色）
-- 退出登录
-
-### 其他规则
-- 密码错误不锁定账号
-
----
-
-## 业务模块：资金费率排行榜
-
-### 数据源
-- USDT永续合约的资金费率（Funding Rate）
-- 交易所：OKX、Binance（BN）、Bybit（BY）
-
-### 6个榜单（交易所配对）
-1. OKX多 BN空
-2. BY多 BN空
-3. OKX多 BY空
-4. BN多 OKX空
-5. BN多 BY空
-6. BY多 OKX空
-
-### 筛选条件
-- 默认展示近24小时数据
-- 支持自定义开始时间、结束时间
-
-### 数据规则
-- 只比较两个交易所同时存在的币种
-- 每个榜单显示资费差最大的前10名
-- 按总资费差额从大到小排序（正值在前）
-
-### 显示列
-- 币种名称
-- 做多方总资费（选定时间段内资金费率之和）
-- 做空方总资费（选定时间段内资金费率之和）
-- 做多方资费结算次数
-- 做空方资费结算次数
-- 总资费差额（做多方收的总资费 - 做空方付出的总资费）—— 支持点击
-  - 点击弹出弹窗，显示每一期资费差额明细
-  - 弹窗显示列：结算时间、做多方(A所)收的资费、做空方(B所)付的资费、差额
-  - 所有数字用百分号表示，保留3位小数
-- 当前开差 =（做空方价格 - 做多方价格）/ 做空方价格，百分比，保留2位小数
-
-### 刷新频率
-- 开差数据：每1分钟自动刷新
-- 资费数据：每1小时刷新
-
-### 子工具：资费统计器
-- 入口：资费排行榜页面内点击按钮弹出弹窗
-
-#### 筛选条件
-- 币种名称
-- 做多交易所
-- 做空交易所
-- 开始时间
-- 结束时间
-- 点击"开始统计"执行查询
-
-#### 统计结果 — 表1：每期明细
-- 时间（每个结算周期）
-- 做多交易所资费
-- 做空交易所资费
-- 资费差（做多收的 - 做空付的）
-
-#### 统计结果 — 表2：按天汇总
-- 时间（按天）
-- 做多交易所当日总资费
-- 做空交易所当日总资费
-- 当日资费差
-
-#### 统计结果 — 表3：总计汇总（最后一行）
-- 做多总资费
-- 做空总资费
-- 总资费差
-
----
-
-## 业务模块：新上线币种
-
-### 数据源
-- USDT永续合约
-- 交易所：OKX、Binance（BN）、Bybit（BY）
-
-### 3个榜单（每个交易所各一个）
-1. OKX 新上线
-2. BN 新上线
-3. BY 新上线
-
-### 数据规则
-- 只显示最近30天内上线的币种
-- 显示全部符合条件的币种
-- 按上线时间排序，最新的在前
-
-### 显示列
-- 币种名称
-- 上线天数
-- 当前资费结算周期的当前资费（%，保留3位小数）
-- 当前价距离第一天收盘价的涨幅（上线第一天不显示涨幅，以该交易所日线收盘价为基准）
-
-### 刷新频率
-- 每5分钟更新一次
-
----
-
-## 业务模块：资费即将突破结算周期
-
-### 数据源
-- USDT永续合约
-- 交易所：OKX、Binance（BN）、Bybit（BY）
-- 三个交易所合并为一个列表
-
-### 数据规则
-- 只显示当前结算周期为 8小时、4小时、2小时 的币种（1小时结算的不显示）
-- 即将突破定义：当前实时资金费率 >= 该币种在该交易所的资费上限（正负方向均算）
-- 显示全部满足条件的数据
-- 按距离下一个资费结算周期倒计时排序
-
-### 显示列
-- 代币名称
-- 交易所
-- 资费上限
-- 实时资费
-- 当前结算周期
-- 基差
-- 距离下一个资费结算周期倒计时
-
-### 刷新频率
-- 基差数据：每5秒更新一次
-- 实时资费：每5秒更新一次
-
----
-
-## 业务模块：价格趋势
-
-### 数据源
-- 仅 Binance（币安）所有 USDT 永续合约币种
-
-### 均线指标
-- MA20、MA60、MA120
-- 4个周期：15分钟、1小时、4小时、日线
-
-### 多头排列定义
-- 实时价格 > MA20 > MA60 > MA120
-
-### 数据规则
-- 只显示至少满足一个周期多头排列的币种，不满足任何周期的不显示
-- 排序规则：
-  1. 先按满足的最高周期级别排序（日线 > 4小时 > 1小时 > 15分钟）
-  2. 同级别再按满足的周期数量多的在前
-
-### 显示列
-- 币种名称
-- 日线周期（✓ / ✗）
-- 4小时周期（✓ / ✗）
-- 1小时周期（✓ / ✗）
-- 15min周期（✓ / ✗）
-
-### 刷新频率
-- 每10分钟计算一次
-
----
-
-## 业务模块：基差监控
-
-### 数据获取
-- 每3秒调用一次 API
-- 请求参数：acceptLongExchanges=["BYBIT"]，acceptShortExchanges=["BINANCE"]，allData=true
-- 监控币安的基差数据
-
-### 预警规则
-- 基差 < -1 时触发预警
-- **首次触发**：预警类型 = "新机会"，记录币种名称+基差到数据库
-- **再次触发**：基差绝对值必须 > 数据库中存储值的1.1倍才再次预警，类型 = "基差扩大"
-  - 例如：存储的是 -1.5，下次需要 ≤ -1.65 才触发
-- 每4小时清零数据库，重新统计
-
-### 显示列
-- 币种名称
-- 预警类型（新机会 / 基差扩大）
-- 当前基差
-- 近5分钟币种价格涨幅
-- 近1小时币种价格涨幅
-- 第X次预警（从添加到数据库以来的预警次数）
-
-### 排序
-- 最新预警在前
-
----
-
-## 业务模块：非对冲机会
-
-### 数据获取
-- 每3秒调用一次 API（http://<your-arbitrage-api-host>:9000/api/v1/arbitrage/chance/list）
-- 做空交易所：BINANCE，做多交易所：OKX 或 BYBIT
-- 参数示例：acceptLongExchanges=["BYBIT"]，acceptShortExchanges=["BINANCE"]，allData=true
-- 获取做多方(A所)：基差a1、实时资费a2、实时价格a3
-- 获取做空方(B所)：基差b1、实时资费b2、实时价格b3
-- 资费正负处理：做多时资费取反（a2为负则实际为正），做空时资费取反（b2为负则实际为负），全局统一处理
-
-### 类型1：资费差套利
-#### 计算
-- 资费差 c = a2 - b2（注意正负处理）
-- 开差 d = (b3 - a3) / a3
-
-#### 预警条件（同时满足）
-1. a1 < a2（做多方资费还会继续增加）
-2. c + d > 0（资费能覆盖开差亏损）
-3. b1 < -1（做空方维持较大基差）
-
-#### 频率限制
-- 同一币种 + 同一做多交易所 + 同一做空交易所，每小时最多预警1次
-
-#### 显示列
-- 币种名称
-- 做多交易所
-- 做空交易所
-- 开差
-- 资费
-- 做空交易所基差
-
-### 类型2：资费打开价差没打开
-#### 预警条件（同时满足）
-1. 开差 < -0.5%（d = (b3 - a3) / a3）
-2. 做空交易所基差 b1 < -3
-
-#### 频率限制
-- 同一币种 + 同一交易所组合，每小时最多预警1次
-- 每3秒监控
-
-#### 显示列
-- 币种名称
-- 做空交易所
-- 做多交易所
-- 开差
-- 做空交易所基差
-- 做空交易所币种近5分钟涨幅
-
----
-
-## 预警配置（需登录）
-
-### 访问控制
-- 未登录用户点击预警配置时跳转登录页，登录后自动回到预警配置页
-
-### 通知方式（3种）
-1. **声音提醒** — 全局开关，关闭后所有预警的声音均不生效
-2. **弹窗提醒** — 全局开关，关闭后所有预警的弹窗均不生效
-3. **Lark 机器人** — 支持配置多个，列表支持增删查改
-   - 机器人名称（自定义）
-   - Webhook 链接（如 https://open.larksuite.com/open-apis/bot/v2/hook/xxx）
-   - 配置预警时从已添加的机器人列表中选择
-
-### 预警类型1：投后监测
-
-#### 列表页
-- 显示所有已监测项目
-- 监测中的排在前面
-- 支持开关控制启停
-- 双击行可修改预警配置
-
-#### 列表显示列
-- 币种名称
-- 开差阀值 / 实时值
-- 价格阀值 / 实时值
-- 1小时持仓跌幅阀值 / 实时值
-- 4小时持仓跌幅阀值 / 实时值
-- 状态（监测中 / 已停止）
-
-#### 新增/编辑配置
-- 币种名称（选择）
-- 做多交易所
-- 做空交易所
-- 开差阀值（选填）
-- 价格阀值（最低价，低于即预警）
-- 1小时持仓跌幅阀值（当前持仓 vs 1小时内最高持仓，如 -20%）
-- 4小时持仓跌幅阀值（同理）
-- 预警方式：声音开关、弹窗开关、Lark机器人（从已配置列表选择）
-
-#### 监测频率
-- 每3秒监测一次
-- 数据来源：http://<your-arbitrage-api-host>:9000/api/v1/arbitrage/chance/list
-
-### 预警类型2：非对冲机会预警
-
-#### 配置项
-- 声音开关
-- 弹窗开关
-- Lark 机器人（从已配置列表选择）
-
-### 预警类型3：基差预警
-
-#### 关联模块
-- 与"基差监控"模块联动，基差监控出现新机会时通过配置的方式提醒
-
-#### 通知方式
-- 声音开关
-- 弹窗开关
-- Lark 机器人（从已配置列表选择）
-
-#### 个性化配置
-- 新机会基差阈值（默认 < -1，可修改，如改为 -2）
-- 基差扩大倍数（默认 1.1 倍，可修改）
-- 清除预警周期（默认 4 小时，可修改为任意小时数，最少 1 小时）
-- 不看的币种（多个用逗号隔开）
-
-#### 预警历史列表
-- 显示该用户已触发的基差预警历史记录
-
-#### 操作
-- 支持立即清除：只清空已预警数据库记录 + 不看的币种列表，其他配置项（阈值、倍数、周期等）保持不变
-
----
-
-## 数据源
-
-### 自有 API
-- API 基地址：http://<your-arbitrage-api-host>:9000
-- API 文档：YApi 项目 ID 5539，Token <your-yapi-token>，文档地址 <your-yapi-url>
-- 关键接口：
-  - POST/GET `/api/v1/arbitrage/chance/list` — 资费、基差、结算周期、价格等实时数据
-
-### 交易所 API
-- **Binance**：历史资费（/fapi/v1/fundingRate）、资费上限（/fapi/v1/fundingInfo）、K线数据、持仓量（OI）、实时价格、涨幅计算
-- **OKX**：历史资费、资费上限、实时价格
-- **Bybit**：历史资费、资费上限、实时价格
-
-### 数据获取优先级
-- 优先从自有 API 获取数据
-- 历史资费、资费上限、K线、持仓量等从交易所 API 获取
-
----
+# Arbitrage Dashboard - 加密货币套利仪表盘
+
+监控 Binance / OKX / Bybit 三大交易所的资金费率、基差、价差等数据，提供套利机会发现和预警功能。
+
+## 功能一览
+
+| 模块 | 说明 |
+|------|------|
+| 资费排行 | 6 个交易所配对的资金费率差排行榜 |
+| 新上线币种 | 近 30 天内新上线的 USDT 永续合约 |
+| 资费突破 | 实时资费即将突破结算上限的币种 |
+| 价格趋势 | 基于 MA20/60/120 的多头排列分析 |
+| 基差监控 | 基差异常预警，自动检测套利机会 |
+| 非对冲机会 | 资费差套利和价差机会检测 |
+| 预警配置 | 自定义预警规则，支持声音/弹窗/飞书通知 |
 
 ## 技术栈
 
-- **后端**：Python
-- **前端**：React
-- **数据库**：MySQL
+- **后端**：Python 3.9+ / FastAPI / SQLAlchemy 2.0 (async) / APScheduler
+- **前端**：React 19 / TypeScript / Ant Design 6 / Vite / Zustand
+- **数据库**：MySQL 5.7+
 - **实时通信**：WebSocket
-- **部署**：先本地运行调通
-
-## 架构说明
-
-### 数据共享
-- 基差监控、非对冲机会、投后监测共用同一个 API 调用（每3秒），共享数据避免重复请求
-
-### 实时推送
-- 后端通过 WebSocket 向前端推送实时数据（开差、基差、资费、价格等）
-
-### 投后监测补充
-- 开差阈值预警条件：开差 < -0.5% 时触发
-- 持仓数据（OI）从币安 API 获取
-
-### 基差字段
-- 基差数据对应自有 API 返回的 shortPremium / longPremium 字段
 
 ---
 
-## 页面布局
-- 单页面，Tab 切换各模块
-- 不需要适配移动端
+## 部署指南
+
+下面一步一步教你从零部署到服务器上。
+
+### 第一步：准备服务器环境
+
+你需要一台 Linux 服务器（推荐 Ubuntu 20.04 或 CentOS 7+），以下操作都在服务器上执行。
+
+#### 1.1 安装 Python 3.9+
+
+```bash
+# Ubuntu
+sudo apt update
+sudo apt install -y python3 python3-pip python3-venv
+
+# CentOS
+sudo yum install -y python3 python3-pip
+
+# 验证版本（需要 3.9 或更高）
+python3 --version
+```
+
+#### 1.2 安装 Node.js 18+
+
+```bash
+# 使用 NodeSource 安装（Ubuntu / CentOS 通用）
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt install -y nodejs    # Ubuntu
+# 或
+sudo yum install -y nodejs    # CentOS
+
+# 验证
+node --version
+npm --version
+```
+
+#### 1.3 安装 MySQL 5.7+
+
+如果你已经有 MySQL（比如云数据库 RDS），跳过这步，直接用你的连接信息。
+
+```bash
+# Ubuntu
+sudo apt install -y mysql-server
+sudo systemctl start mysql
+sudo systemctl enable mysql
+
+# 设置 root 密码
+sudo mysql_secure_installation
+```
+
+安装完成后，创建一个数据库：
+
+```bash
+# 登录 MySQL
+mysql -u root -p
+
+# 在 MySQL 命令行中执行：
+CREATE DATABASE arbitrage DEFAULT CHARSET utf8mb4;
+CREATE USER 'arb_user'@'%' IDENTIFIED BY '你的密码';
+GRANT ALL PRIVILEGES ON arbitrage.* TO 'arb_user'@'%';
+FLUSH PRIVILEGES;
+EXIT;
+```
+
+> 记住你设置的 **数据库名**、**用户名**、**密码**，后面要用。
+
+#### 1.4 安装 Git
+
+```bash
+# Ubuntu
+sudo apt install -y git
+
+# CentOS
+sudo yum install -y git
+```
+
+---
+
+### 第二步：下载代码
+
+```bash
+# 在服务器上选一个目录
+cd /home
+
+# 下载代码
+git clone https://github.com/johnnyfirst1/arbitrage-dashboard-public.git
+
+# 进入项目目录
+cd arbitrage-dashboard-public
+```
+
+---
+
+### 第三步：配置后端
+
+#### 3.1 创建 Python 虚拟环境
+
+```bash
+cd /home/arbitrage-dashboard-public/backend
+
+# 创建虚拟环境
+python3 -m venv venv
+
+# 激活虚拟环境（每次操作后端都要先激活）
+source venv/bin/activate
+
+# 安装依赖
+pip install -r requirements.txt
+```
+
+> 如果 pip install 很慢，可以换国内源：
+> ```bash
+> pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+> ```
+
+#### 3.2 配置环境变量
+
+```bash
+# 复制示例配置文件
+cp .env.example .env
+
+# 编辑配置
+vi .env
+```
+
+把 `.env` 的内容改成你自己的信息：
+
+```env
+# 数据库连接
+# 格式：mysql+aiomysql://用户名:密码@数据库地址:端口/数据库名?charset=utf8mb4
+DATABASE_URL=mysql+aiomysql://arb_user:你的密码@127.0.0.1:3306/arbitrage?charset=utf8mb4
+
+# JWT 密钥（随便写一串复杂的字符串，用于登录加密）
+JWT_SECRET=my-super-secret-key-abc123xyz
+
+# 以下两项不用改
+JWT_ALGORITHM=HS256
+JWT_EXPIRE_DAYS=7
+
+# 套利数据 API 地址（找项目提供者要这个地址）
+ARBITRAGE_API_URL=http://你的套利API地址:9000
+```
+
+**各项说明：**
+
+| 配置项 | 说明 | 示例 |
+|--------|------|------|
+| DATABASE_URL | MySQL 连接地址 | `mysql+aiomysql://arb_user:pass123@127.0.0.1:3306/arbitrage?charset=utf8mb4` |
+| JWT_SECRET | 登录加密密钥，随便填一串长字符 | `abc123-my-secret-key-xyz` |
+| ARBITRAGE_API_URL | 套利数据源 API 地址 | `http://1.2.3.4:9000` |
+
+#### 3.3 测试后端能否启动
+
+```bash
+# 确保在 backend 目录，虚拟环境已激活
+cd /home/arbitrage-dashboard-public/backend
+source venv/bin/activate
+
+# 启动后端
+python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+看到类似下面的输出就是成功了：
+
+```
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+```
+
+> 第一次启动时，程序会**自动创建所有数据库表**，不需要手动建表。
+
+按 `Ctrl+C` 停止，继续下一步。
+
+---
+
+### 第四步：配置前端
+
+```bash
+cd /home/arbitrage-dashboard-public/frontend
+
+# 安装依赖
+npm install
+```
+
+> 如果 npm install 很慢，可以换淘宝源：
+> ```bash
+> npm install --registry https://registry.npmmirror.com
+> ```
+
+#### 4.1 打包前端（生产部署）
+
+```bash
+# 打包
+npm run build
+```
+
+打包完成后会生成 `dist` 目录，里面是静态文件。
+
+---
+
+### 第五步：正式部署（让程序一直运行）
+
+开发测试时可以直接用上面的命令启动。正式部署需要让程序在后台持续运行，即使关掉终端也不会停止。
+
+#### 方式一：使用 systemd（推荐）
+
+##### 5.1 创建后端服务
+
+```bash
+sudo vi /etc/systemd/system/arb-backend.service
+```
+
+粘贴以下内容：
+
+```ini
+[Unit]
+Description=Arbitrage Dashboard Backend
+After=network.target mysql.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/arbitrage-dashboard-public/backend
+Environment=PATH=/home/arbitrage-dashboard-public/backend/venv/bin:/usr/bin
+ExecStart=/home/arbitrage-dashboard-public/backend/venv/bin/python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+##### 5.2 启动后端服务
+
+```bash
+# 重新加载配置
+sudo systemctl daemon-reload
+
+# 启动
+sudo systemctl start arb-backend
+
+# 设置开机自启
+sudo systemctl enable arb-backend
+
+# 查看状态（应该显示 active (running)）
+sudo systemctl status arb-backend
+
+# 查看日志（排查问题用）
+sudo journalctl -u arb-backend -f
+```
+
+##### 5.3 安装 Nginx（用来访问前端页面）
+
+```bash
+# Ubuntu
+sudo apt install -y nginx
+
+# CentOS
+sudo yum install -y nginx
+```
+
+##### 5.4 配置 Nginx
+
+```bash
+sudo vi /etc/nginx/sites-available/arbitrage
+```
+
+> CentOS 没有 sites-available 目录，直接编辑 `/etc/nginx/conf.d/arbitrage.conf`
+
+粘贴以下内容：
+
+```nginx
+server {
+    listen 80;
+    server_name _;  # 如果有域名，把 _ 改成你的域名
+
+    # 前端静态文件
+    root /home/arbitrage-dashboard-public/frontend/dist;
+    index index.html;
+
+    # 前端路由（单页应用）
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # 后端 API 代理
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    # WebSocket 代理
+    location /ws {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_read_timeout 86400;
+    }
+}
+```
+
+##### 5.5 启用 Nginx 配置
+
+```bash
+# Ubuntu：创建软链接
+sudo ln -s /etc/nginx/sites-available/arbitrage /etc/nginx/sites-enabled/
+# 删除默认配置（避免冲突）
+sudo rm -f /etc/nginx/sites-enabled/default
+
+# 测试配置是否正确
+sudo nginx -t
+
+# 启动 Nginx
+sudo systemctl restart nginx
+sudo systemctl enable nginx
+```
+
+#### 方式二：使用 Screen（简单方式）
+
+如果不想配置 systemd，可以用 screen 简单地后台运行：
+
+```bash
+# 安装 screen
+sudo apt install -y screen  # Ubuntu
+sudo yum install -y screen  # CentOS
+
+# 启动后端
+screen -S backend
+cd /home/arbitrage-dashboard-public/backend
+source venv/bin/activate
+python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+# 按 Ctrl+A 然后按 D 退出 screen（程序继续在后台运行）
+
+# 如果不用 Nginx，可以直接启动前端开发服务器
+screen -S frontend
+cd /home/arbitrage-dashboard-public/frontend
+npx vite --host 0.0.0.0
+# 按 Ctrl+A 然后按 D 退出 screen
+
+# 重新进入 screen 查看
+screen -r backend
+screen -r frontend
+```
+
+---
+
+### 第六步：访问你的仪表盘
+
+部署完成后，在浏览器打开：
+
+- **使用 Nginx（推荐）**：`http://你的服务器IP`
+- **使用 Screen 开发模式**：`http://你的服务器IP:5173`
+
+> 注意：启动后需要等 1-2 分钟，后端才会拉取到第一批实时数据。
+
+---
+
+## 代理配置（可选）
+
+如果你的服务器在国内，访问 Binance/OKX/Bybit API 可能需要代理。在 `.env` 中添加：
+
+```env
+HTTP_PROXY=http://127.0.0.1:你的代理端口
+```
+
+如果你的服务器在海外（比如香港、新加坡），通常不需要配代理。
+
+---
+
+## 常见问题
+
+### Q: 启动后端报 "Can't connect to MySQL server"
+
+检查：
+1. MySQL 是否在运行：`systemctl status mysql`
+2. `.env` 里的数据库地址、用户名、密码是否正确
+3. 如果用的是云数据库，检查安全组是否放行了 3306 端口
+
+### Q: 前端页面打开是空白
+
+检查：
+1. 是否执行了 `npm run build`
+2. Nginx 配置中 `root` 路径是否指向 `frontend/dist`
+3. 执行 `sudo nginx -t` 检查配置是否有语法错误
+
+### Q: 页面能打开，但没有数据
+
+1. 后端是否正常运行：`curl http://127.0.0.1:8000/api/health`
+2. 启动后需要等 1-2 分钟才有实时数据
+3. 检查 `.env` 中的 `ARBITRAGE_API_URL` 是否正确
+
+### Q: pip install 报错
+
+```bash
+# 如果提示缺少 mysql 开发包
+sudo apt install -y libmysqlclient-dev   # Ubuntu
+sudo yum install -y mysql-devel          # CentOS
+
+# 如果提示缺少 Python 开发包
+sudo apt install -y python3-dev          # Ubuntu
+sudo yum install -y python3-devel        # CentOS
+```
+
+### Q: npm install 报错
+
+```bash
+# 清除缓存重试
+rm -rf node_modules package-lock.json
+npm install
+```
+
+---
+
+## 常用运维命令
+
+```bash
+# 查看后端状态
+sudo systemctl status arb-backend
+
+# 重启后端
+sudo systemctl restart arb-backend
+
+# 查看后端实时日志
+sudo journalctl -u arb-backend -f
+
+# 重启 Nginx
+sudo systemctl restart nginx
+
+# 更新代码
+cd /home/arbitrage-dashboard-public
+git pull
+# 后端：重启服务
+sudo systemctl restart arb-backend
+# 前端：重新打包 + 重启 Nginx
+cd frontend && npm run build
+sudo systemctl restart nginx
+```
+
+---
+
+## 项目结构
+
+```
+arbitrage-dashboard-public/
+├── backend/                  # 后端代码
+│   ├── app/
+│   │   ├── main.py           # 入口文件
+│   │   ├── config.py         # 配置读取
+│   │   ├── database.py       # 数据库连接
+│   │   ├── models/           # 数据库表定义（自动建表）
+│   │   ├── routers/          # API 接口
+│   │   ├── services/         # 业务逻辑
+│   │   ├── schedulers/       # 定时任务
+│   │   ├── utils/            # 工具函数
+│   │   └── websocket/        # WebSocket 管理
+│   ├── requirements.txt      # Python 依赖
+│   ├── .env.example          # 环境变量模板
+│   └── .env                  # 环境变量（需自己创建，不要上传）
+├── frontend/                 # 前端代码
+│   ├── src/
+│   │   ├── pages/            # 页面组件
+│   │   ├── api/              # API 调用
+│   │   ├── hooks/            # 自定义 Hooks
+│   │   ├── stores/           # 状态管理
+│   │   └── components/       # 公共组件
+│   ├── package.json          # Node.js 依赖
+│   └── vite.config.ts        # Vite 配置
+├── HANDOVER.md               # 技术交接文档（开发者看）
+├── REQUIREMENTS.md           # 功能需求文档
+└── README.md                 # 本文件
+```
+
+---
+
+## License
+
+MIT
