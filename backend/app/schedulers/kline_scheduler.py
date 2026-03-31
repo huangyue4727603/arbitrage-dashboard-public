@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from typing import Any, Optional
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from sqlalchemy import delete, select, func
 from sqlalchemy.dialects.mysql import insert as mysql_insert
@@ -481,14 +482,13 @@ class KlineScheduler:
             next_run_time=datetime.now() + timedelta(seconds=60),
         )
 
-        # Kline data refresh every 5 minutes (delay 120s to avoid Binance rate limit)
+        # Kline data refresh at every 5-minute mark + 5s (aligned to candle close)
         self._scheduler.add_job(
             self.refresh,
-            trigger=IntervalTrigger(minutes=5),
+            trigger=CronTrigger(minute="*/5", second=5),
             id="kline_refresh",
             name="Fetch kline data",
             replace_existing=True,
-            next_run_time=datetime.now() + timedelta(minutes=5),
         )
 
         # Price changes refresh every 5 minutes (from DB, no API calls)
