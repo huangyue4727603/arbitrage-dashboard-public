@@ -190,7 +190,7 @@ export default function PostInvestment() {
     return false;
   };
 
-  const renderThresholdCell = (threshold: number | null, current: number | null, suffix?: string) => {
+  const renderThresholdCell = (threshold: number | null | undefined, current: number | null | undefined, suffix?: string) => {
     const thresholdStr = threshold != null ? `${threshold}${suffix || ''}` : '-';
     const currentStr = current != null ? `${current}${suffix || ''}` : '-';
     return (

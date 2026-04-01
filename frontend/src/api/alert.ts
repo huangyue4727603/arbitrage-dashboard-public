@@ -63,7 +63,8 @@ export interface BasisConfigForm {
   basis_threshold: number;
   expand_multiplier: number;
   clear_interval_hours: number;
-  blocked_coins?: string[];
+  blocked_coins?: string[] | string;
+  temp_blocked_coins?: string;
   sound_enabled: boolean;
   popup_enabled: boolean;
   lark_bot_id?: number | null;

@@ -91,10 +91,11 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     from app.models.invite_code import InviteCode
     from datetime import datetime
 
+    from sqlalchemy import or_
     invite_result = await db.execute(
         select(InviteCode).where(
             InviteCode.code == body.invite_code.strip(),
-            InviteCode.is_used == False,
+            or_(InviteCode.is_used == False, InviteCode.reusable == True),
         )
     )
     invite = invite_result.scalar_one_or_none()
@@ -118,10 +119,11 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     db.add(user)
     await db.flush()
 
-    # Mark invite code as used
-    invite.is_used = True
-    invite.used_by = user.id
-    invite.used_at = datetime.now()
+    # Mark invite code as used (skip for reusable codes)
+    if not invite.reusable:
+        invite.is_used = True
+        invite.used_by = user.id
+        invite.used_at = datetime.now()
     await db.commit()
 
     token = create_access_token(user.id)

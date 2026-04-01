@@ -32,6 +32,18 @@ class SettingsResponse(BaseModel):
 
 # ---------- Routes ----------
 
+@router.get("/notification", response_model=SettingsResponse)
+async def get_notification(
+    user: User = Depends(require_auth),
+):
+    """Get current notification settings."""
+    return SettingsResponse(
+        theme=user.theme,
+        sound_enabled=user.sound_enabled,
+        popup_enabled=user.popup_enabled,
+    )
+
+
 @router.put("/theme", response_model=SettingsResponse)
 async def update_theme(
     body: ThemeRequest,

@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
-import { Card, Table, Tag, Space, Select, Row, Col, Progress } from 'antd';
+import { Card, Table, Tag, Space, Select, Row, Col, Progress, Button } from 'antd';
+import { ReloadOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useWsStore } from '../../stores/wsStore';
@@ -86,7 +87,8 @@ export default function FundingBreak() {
       }
     };
     fetchData();
-    return () => { cancelled = true; };
+    const timer = setInterval(fetchData, 60000);
+    return () => { cancelled = true; clearInterval(timer); };
   }, [transformData, markUpdateTime]);
 
   // Update from WebSocket
@@ -260,6 +262,7 @@ export default function FundingBreak() {
         <Space size={16}>
           {updateTime && <span style={{ color: '#999', fontSize: 12 }}>更新时间：{updateTime}</span>}
           <span style={{ color: '#999', fontSize: 12 }}>共 {data.length} 个币种，{breakingCount} 个突破</span>
+          <Button icon={<ReloadOutlined />} onClick={async () => { const res = await fundingBreakApi.getBreakingCoins(); setData(transformData(res.data)); markUpdateTime(); }} loading={loading}>刷新</Button>
         </Space>
       }
     >

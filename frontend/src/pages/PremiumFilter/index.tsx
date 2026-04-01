@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, Table, Button, Space, Select, InputNumber, message, Row, Col } from 'antd';
-import { SearchOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { fetchPremiumFilter, fetchRealtimeBasis, type PremiumFilterItem } from '../../api/premiumFilter';
@@ -22,9 +22,7 @@ const renderPercent = (val: number | null | undefined, decimals = 3) => {
 };
 
 interface DisplayItem extends PremiumFilterItem {
-  realtime_basis?: number;
   change_1d?: number;
-  settlement_period?: number | null;
 }
 
 export default function PremiumFilter() {
@@ -54,10 +52,12 @@ export default function PremiumFilter() {
     }
   }, [hours, threshold]);
 
-  // 页面加载时自动查询
+  // 页面加载时自动查询 + 1分钟定时刷新
   useEffect(() => {
     handleQuery();
-  }, []);
+    const timer = setInterval(handleQuery, 60000);
+    return () => clearInterval(timer);
+  }, [handleQuery]);
 
   // 轮询实时基差（5秒），仅在有数据时
   useEffect(() => {
@@ -179,7 +179,10 @@ export default function PremiumFilter() {
     <Card
       title="大额基差"
       extra={
-        lastUpdate && <span style={{ color: '#999', fontSize: 12 }}>更新时间：{lastUpdate}</span>
+        <Space>
+          {lastUpdate && <span style={{ color: '#999', fontSize: 12 }}>更新时间：{lastUpdate}</span>}
+          <Button icon={<ReloadOutlined />} onClick={handleQuery} loading={loading}>刷新</Button>
+        </Space>
       }
     >
       <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>

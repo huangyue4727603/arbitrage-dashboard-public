@@ -151,30 +151,34 @@ class KlineScheduler:
             logger.info("=== All kline data is complete ===")
 
     async def backfill_batch(self) -> None:
-        """Process a small batch from the backfill queue.
+        """Process a batch from the backfill queue.
 
-        Runs every 60 seconds, processes 2 items sequentially (1 at a time)
-        to avoid Binance rate limits. Pauses on 418 errors.
+        Runs every 30 seconds, processes 20 items with concurrency 5.
+        251 proxy IPs available so rate limits are not a concern.
+        Pauses on 418 errors as a safety net.
         """
         if not self._backfill_queue:
             return
 
-        # Take a very small batch
-        batch_size = 2
+        batch_size = 20
         batch = self._backfill_queue[:batch_size]
 
         success = 0
         rate_limited = False
+        semaphore = asyncio.Semaphore(5)
 
-        async with BinanceClient() as client:
-            for symbol, interval in batch:
+        async def fetch_one(client: BinanceClient, symbol: str, interval: str) -> bool:
+            nonlocal rate_limited
+            async with semaphore:
+                if rate_limited:
+                    return False
                 try:
                     limit = BACKFILL_LIMIT.get(interval, 50)
                     klines = await client.get_klines(
                         symbol=symbol, interval=interval, limit=limit, timeout=20
                     )
                     if not klines:
-                        continue
+                        return False
 
                     async with async_session_factory() as db:
                         for k in klines:
@@ -196,17 +200,20 @@ class KlineScheduler:
                             )
                             await db.execute(stmt)
                         await db.commit()
-                    success += 1
+                    return True
                 except Exception as exc:
                     err_str = str(exc)
                     if "418" in err_str or "teapot" in err_str.lower():
                         logger.warning("Backfill: Binance rate limited (418), pausing backfill")
                         rate_limited = True
-                        break
+                        return False
                     logger.debug("Backfill failed %s %s: %s", symbol, interval, exc)
+                    return False
 
-                # Small delay between requests
-                await asyncio.sleep(1)
+        async with BinanceClient() as client:
+            tasks = [fetch_one(client, symbol, interval) for symbol, interval in batch]
+            results = await asyncio.gather(*tasks)
+            success = sum(1 for r in results if r)
 
         if rate_limited:
             # Don't remove items from queue, will retry later
@@ -471,55 +478,23 @@ class KlineScheduler:
             next_run_time=datetime.now() + timedelta(seconds=5),
         )
 
-        # Gradual backfill: 2 items every 60 seconds (very gentle on Binance API)
+        # Backfill: 20 items every 30 seconds (251 proxy IPs, rate limits not a concern)
         self._scheduler.add_job(
             self.backfill_batch,
-            trigger=IntervalTrigger(seconds=60),
+            trigger=IntervalTrigger(seconds=30),
             id="kline_backfill",
-            name="Gradual kline backfill",
+            name="Kline backfill",
             replace_existing=True,
-            next_run_time=datetime.now() + timedelta(seconds=60),
+            next_run_time=datetime.now() + timedelta(seconds=30),
         )
 
-        # Kline data refresh per interval, aligned to each candle close + 5s
-        # 5m:  every 5 min  → ~545 req/5min  = ~109 req/min
-        # 15m: every 15 min → ~545 req/15min = ~36 req/min
-        # 1h:  every 1 hour → ~545 req/hour
-        # 4h:  every 4 hours
-        # 1d:  every 6 hours
+        # Kline data refresh: all intervals every 5 min, aligned to candle close + 5s
+        # 251 IPs available, ~2725 req/5min = ~11 req/min/IP, well within limits
         self._scheduler.add_job(
-            lambda: self.refresh_interval("5m"),
+            self.refresh,
             trigger=CronTrigger(minute="*/5", second=5),
-            id="kline_refresh_5m",
-            name="Fetch 5m klines",
-            replace_existing=True,
-        )
-        self._scheduler.add_job(
-            lambda: self.refresh_interval("15m"),
-            trigger=CronTrigger(minute="*/15", second=10),
-            id="kline_refresh_15m",
-            name="Fetch 15m klines",
-            replace_existing=True,
-        )
-        self._scheduler.add_job(
-            lambda: self.refresh_interval("1h"),
-            trigger=CronTrigger(minute=0, second=15),
-            id="kline_refresh_1h",
-            name="Fetch 1h klines",
-            replace_existing=True,
-        )
-        self._scheduler.add_job(
-            lambda: self.refresh_interval("4h"),
-            trigger=CronTrigger(hour="*/4", minute=0, second=20),
-            id="kline_refresh_4h",
-            name="Fetch 4h klines",
-            replace_existing=True,
-        )
-        self._scheduler.add_job(
-            lambda: self.refresh_interval("1d"),
-            trigger=CronTrigger(hour="*/6", minute=0, second=25),
-            id="kline_refresh_1d",
-            name="Fetch 1d klines",
+            id="kline_refresh",
+            name="Fetch kline data (all intervals)",
             replace_existing=True,
         )
 

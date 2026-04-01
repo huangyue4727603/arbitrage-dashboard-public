@@ -12,6 +12,7 @@ class InviteCode(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     code: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, index=True)
     is_used: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    reusable: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     used_by: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("arb_users.id", ondelete="SET NULL"), nullable=True
     )

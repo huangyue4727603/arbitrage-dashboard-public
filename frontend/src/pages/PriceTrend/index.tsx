@@ -45,9 +45,11 @@ export default function PriceTrend() {
     }
   }, []);
 
-  // Initial load
+  // Initial load + 1 min auto refresh
   useEffect(() => {
     fetchData();
+    const timer = setInterval(fetchData, 60000);
+    return () => clearInterval(timer);
   }, [fetchData]);
 
   // Update from WebSocket

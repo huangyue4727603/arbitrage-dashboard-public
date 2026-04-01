@@ -18,11 +18,10 @@ class Settings(BaseSettings):
 
 
 def get_proxy() -> str:
-    """Get HTTP proxy URL from settings or environment."""
-    settings = get_settings()
-    if settings.HTTP_PROXY:
-        return settings.HTTP_PROXY
-    return os.environ.get("http_proxy", "") or os.environ.get("HTTP_PROXY", "")
+    """Get next proxy URL from the rotating IP pool."""
+    from app.services.proxy_manager import proxy_manager
+    proxy = proxy_manager.next_proxy()
+    return proxy or ""
 
 
 @lru_cache

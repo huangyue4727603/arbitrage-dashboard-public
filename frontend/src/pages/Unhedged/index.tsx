@@ -194,6 +194,8 @@ export default function Unhedged() {
 
   useEffect(() => {
     fetchData();
+    const timer = setInterval(fetchData, 60000);
+    return () => clearInterval(timer);
   }, [fetchData]);
 
   // Update from WebSocket

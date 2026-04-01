@@ -15,7 +15,6 @@ import NewListing from '../pages/NewListing';
 import FundingBreak from '../pages/FundingBreak';
 import PriceTrend from '../pages/PriceTrend';
 import BasisMonitor from '../pages/BasisMonitor';
-import Unhedged from '../pages/Unhedged';
 import AlertConfig from '../pages/AlertConfig';
 import PremiumFilter from '../pages/PremiumFilter';
 

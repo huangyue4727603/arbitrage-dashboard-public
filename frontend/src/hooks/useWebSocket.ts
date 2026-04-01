@@ -50,7 +50,7 @@ export function useWebSocket(token?: string | null) {
 
       const params = tokenRef.current ? `?token=${tokenRef.current}` : '';
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const ws = new WebSocket(`${protocol}//${window.location.host}/ws${params}`);
+      const ws = new WebSocket(`${protocol}//${window.location.host}/arbitrage/ws${params}`);
 
       wsRef.current = ws;
       setStatus('connecting');

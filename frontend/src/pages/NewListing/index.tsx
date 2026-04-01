@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { Card, Table, Tag, Space, Select, Row, Col } from 'antd';
+import { Card, Table, Tag, Space, Select, Row, Col, Button } from 'antd';
+import { ReloadOutlined } from '@ant-design/icons';
 
 const exchangeTagColor: Record<string, string> = {
   BN: 'gold',
@@ -16,7 +17,7 @@ const periodTagColor: Record<number, string> = {
 import type { ColumnsType } from 'antd/es/table';
 import { fetchNewListings, type NewListingItem } from '../../api/newListing';
 
-const REFRESH_INTERVAL = 5 * 60 * 1000;
+const REFRESH_INTERVAL = 60 * 1000;
 
 const exchangeLabel: Record<string, string> = {
   BN: 'Binance',
@@ -167,7 +168,10 @@ export default function NewListing() {
 
   return (
     <Card title="新上线币种" extra={
-      lastUpdate && <span style={{ color: '#999', fontSize: 12 }}>更新时间：{lastUpdate}</span>
+      <Space>
+        {lastUpdate && <span style={{ color: '#999', fontSize: 12 }}>更新时间：{lastUpdate}</span>}
+        <Button icon={<ReloadOutlined />} onClick={loadData} loading={loading}>刷新</Button>
+      </Space>
     }>
       <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
         <Col>

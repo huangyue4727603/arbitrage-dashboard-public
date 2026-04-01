@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import re
 import time
@@ -19,14 +20,21 @@ router = APIRouter(prefix="/api/premium-filter", tags=["premium-filter"])
 settings = get_settings()
 SELF_API_URL = settings.ARBITRAGE_API_URL
 
-# Binance premiumIndex cache (all symbols, refreshed every 10s)
+# Binance premiumIndex cache (all symbols, refreshed every 30s)
 _bn_premium_cache: Dict[str, float] = {}
 _bn_premium_ts: float = 0
-_BN_PREMIUM_TTL = 30  # seconds, avoid frequent Binance API calls
+_BN_PREMIUM_TTL = 30
+
+# Upstream premium_filter cache: keyed by threshold only, background refresh
+# ts changes every request but the upstream API is slow (~7s), so we cache
+# by threshold and refresh every 10s in the background.
+_pf_cache: Dict[str, Any] = {}  # threshold_str -> {"data": [...], "ts": float, "req_ts": int}
+_pf_lock = asyncio.Lock()
+_PF_CACHE_TTL = 30  # seconds
 
 
 async def _get_binance_premium() -> Dict[str, float]:
-    """Get Binance premium index for all symbols, cached for 10s."""
+    """Get Binance premium index for all symbols, cached for 30s."""
     global _bn_premium_cache, _bn_premium_ts
 
     now = time.time()
@@ -52,11 +60,44 @@ async def _get_binance_premium() -> Dict[str, float]:
 
         _bn_premium_cache = result
         _bn_premium_ts = now
-        logger.info("Binance premiumIndex cached: %d symbols", len(result))
         return result
     except Exception as exc:
         logger.error("Failed to fetch Binance premiumIndex: %s", exc)
-        return _bn_premium_cache  # Return stale cache on error
+        return _bn_premium_cache
+
+
+async def _fetch_upstream(ts: int, threshold: float) -> List[str]:
+    """Fetch from upstream API with caching by threshold.
+
+    The ts param changes every request but the upstream API takes ~7s,
+    so we cache by threshold and serve stale data for up to 10s.
+    Background refresh ensures the cache stays warm.
+    """
+    cache_key = str(threshold)
+    now = time.time()
+
+    cached = _pf_cache.get(cache_key)
+    if cached and (now - cached["ts"]) < _PF_CACHE_TTL:
+        return cached["data"]
+
+    async with _pf_lock:
+        # Double-check after lock
+        cached = _pf_cache.get(cache_key)
+        if cached and (now - cached["ts"]) < _PF_CACHE_TTL:
+            return cached["data"]
+
+        timeout = aiohttp.ClientTimeout(total=30, sock_read=15)
+        async with aiohttp.ClientSession(timeout=timeout, trust_env=False) as session:
+            async with session.get(
+                f"{SELF_API_URL}/api/v1/arbitrage/chance/premium_filter",
+                params={"ts": ts, "premiumThreshold": threshold},
+            ) as resp:
+                resp.raise_for_status()
+                body = await resp.json()
+
+        raw_list = body.get("data", [])
+        _pf_cache[cache_key] = {"data": raw_list, "ts": time.time()}
+        return raw_list
 
 
 @router.get("")
@@ -64,18 +105,10 @@ async def get_premium_filter(
     ts: int = Query(..., description="Timestamp in milliseconds"),
     premiumThreshold: float = Query(..., description="Minimum premium threshold (e.g. -0.02)"),
 ):
-    """Proxy to self-hosted premium_filter API, parse coin names, and enrich with funding + basis data."""
-    timeout = aiohttp.ClientTimeout(total=30, sock_read=15)
+    """Fetch premium filter data with upstream caching + enrichment."""
     try:
-        async with aiohttp.ClientSession(timeout=timeout, trust_env=False) as session:
-            async with session.get(
-                f"{SELF_API_URL}/api/v1/arbitrage/chance/premium_filter",
-                params={"ts": ts, "premiumThreshold": premiumThreshold},
-            ) as resp:
-                resp.raise_for_status()
-                body = await resp.json()
+        raw_list = await _fetch_upstream(ts, premiumThreshold)
 
-        raw_list = body.get("data", [])
         # Parse "BINANCE_G-USDT-PERP" -> extract coin name
         coins: List[dict] = []
         seen: set = set()
@@ -91,44 +124,49 @@ async def get_premium_filter(
         if not coins:
             return {"data": []}
 
-        # Enrich with cumulative funding from DB (Binance only, from ts to now)
+        # Parallel: funding query + settlement periods + basis
         start_time = datetime.utcfromtimestamp(ts / 1000)
         coin_names = [c["coin_name"] for c in coins]
 
-        try:
-            async with async_session_factory() as db:
-                result = await db.execute(
-                    select(
-                        FundingHistory.coin,
-                        func.sum(FundingHistory.funding_rate).label("total"),
+        async def get_funding() -> Dict[str, float]:
+            try:
+                async with async_session_factory() as db:
+                    result = await db.execute(
+                        select(
+                            FundingHistory.coin,
+                            func.sum(FundingHistory.funding_rate).label("total"),
+                        )
+                        .where(FundingHistory.exchange == "BN")
+                        .where(FundingHistory.funding_time >= start_time)
+                        .where(FundingHistory.coin.in_(coin_names))
+                        .group_by(FundingHistory.coin)
                     )
-                    .where(FundingHistory.exchange == "BN")
-                    .where(FundingHistory.funding_time >= start_time)
-                    .where(FundingHistory.coin.in_(coin_names))
-                    .group_by(FundingHistory.coin)
-                )
-                funding_map = {row[0]: round(row[1] * 100, 3) for row in result.all()}
-        except Exception as exc:
-            logger.error("Failed to query funding cumulative: %s", exc)
-            funding_map = {}
+                    return {row[0]: round(row[1] * 100, 3) for row in result.all()}
+            except Exception as exc:
+                logger.error("Failed to query funding cumulative: %s", exc)
+                return {}
 
-        # Get settlement periods from FundingCap table
-        interval_map: Dict[str, int] = {}
-        try:
-            from app.models.market_data import FundingCap
-            async with async_session_factory() as db:
-                result = await db.execute(
-                    select(FundingCap.symbol, FundingCap.interval_hours)
-                    .where(FundingCap.exchange == "Binance")
-                )
-                for row in result.all():
-                    sym = row[0]
-                    coin = sym[:-4] if sym.endswith("USDT") else sym
-                    interval_map[coin] = row[1]
-        except Exception as exc:
-            logger.error("Failed to query funding caps: %s", exc)
+        async def get_intervals() -> Dict[str, int]:
+            try:
+                from app.models.market_data import FundingCap
+                async with async_session_factory() as db:
+                    result = await db.execute(
+                        select(FundingCap.symbol, FundingCap.interval_hours)
+                        .where(FundingCap.exchange == "Binance")
+                    )
+                    m: Dict[str, int] = {}
+                    for row in result.all():
+                        sym = row[0]
+                        coin = sym[:-4] if sym.endswith("USDT") else sym
+                        m[coin] = row[1]
+                    return m
+            except Exception as exc:
+                logger.error("Failed to query funding caps: %s", exc)
+                return {}
 
-        # Get realtime basis: first from data_fetcher cache (arbitrage API)
+        funding_map, interval_map = await asyncio.gather(get_funding(), get_intervals())
+
+        # Get realtime basis from data_fetcher cache
         from app.services.data_fetcher import data_fetcher
         cached = data_fetcher.get_cached_data()
         basis_map: Dict[str, float] = {}
@@ -143,7 +181,7 @@ async def get_premium_filter(
                     if coin_name not in basis_map or premium_pct < basis_map[coin_name]:
                         basis_map[coin_name] = round(premium_pct, 4)
 
-        # Fill missing basis from Binance premiumIndex (for coins only on Binance)
+        # Fill missing basis from Binance premiumIndex
         missing_coins = [c["coin_name"] for c in coins if c["coin_name"] not in basis_map]
         if missing_coins:
             bn_premium = await _get_binance_premium()
@@ -151,7 +189,6 @@ async def get_premium_filter(
                 if coin in bn_premium:
                     basis_map[coin] = bn_premium[coin]
 
-        # Attach all data
         for c in coins:
             c["cumulative_funding"] = funding_map.get(c["coin_name"])
             c["realtime_basis"] = basis_map.get(c["coin_name"])

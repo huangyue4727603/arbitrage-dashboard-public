@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Modal, Form, Select, DatePicker, Button, Table, Descriptions, Tabs, message } from 'antd';
+import { Modal, Form, Select, DatePicker, Button, Table, Tabs, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, DatePicker, Button, Space, message, Select, InputNumber, Row, Col, Typography } from 'antd';
-import { CalculatorOutlined } from '@ant-design/icons';
+import { CalculatorOutlined, ReloadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
 import { fundingApi, type RankItem, type RealtimeData } from '../../api/funding';
@@ -78,6 +78,8 @@ export default function FundingRank() {
 
   useEffect(() => {
     fetchRankings();
+    const timer = setInterval(fetchRankings, 60000);
+    return () => clearInterval(timer);
   }, [fetchRankings]);
 
   // Poll realtime every 5 seconds
@@ -149,6 +151,9 @@ export default function FundingRank() {
               更新时间: {lastUpdate}
             </Text>
           )}
+          <Button icon={<ReloadOutlined />} onClick={fetchRankings} loading={loading}>
+            刷新
+          </Button>
           <Button
             type="primary"
             icon={<CalculatorOutlined />}
