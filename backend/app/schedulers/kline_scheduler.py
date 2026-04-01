@@ -227,8 +227,8 @@ class KlineScheduler:
     # Periodic refresh (original logic)
     # ------------------------------------------------------------------
 
-    async def refresh(self) -> None:
-        """Fetch latest klines for all symbols and save to DB."""
+    async def refresh_interval(self, interval: str) -> None:
+        """Fetch latest klines for a single interval and save to DB."""
         symbols = await self._get_symbols()
         if not symbols:
             return
@@ -238,7 +238,7 @@ class KlineScheduler:
 
         semaphore = asyncio.Semaphore(3)
 
-        async def fetch_and_save(client: BinanceClient, symbol: str, interval: str) -> int:
+        async def fetch_and_save(client: BinanceClient, symbol: str) -> int:
             async with semaphore:
                 try:
                     klines = await client.get_klines(
@@ -275,20 +275,19 @@ class KlineScheduler:
                     return 0
 
         async with BinanceClient() as client:
-            tasks = []
-            for symbol in symbols:
-                for interval in KLINE_INTERVALS:
-                    tasks.append(fetch_and_save(client, symbol, interval))
-
+            tasks = [fetch_and_save(client, symbol) for symbol in symbols]
             results = await asyncio.gather(*tasks, return_exceptions=True)
             saved = sum(r for r in results if isinstance(r, int))
-            logger.info("Kline refresh: saved %d records for %d symbols (%d intervals, limit=%d)",
-                        saved, len(symbols), len(KLINE_INTERVALS), limit)
+            logger.info("Kline refresh [%s]: saved %d records for %d symbols (limit=%d)",
+                        interval, saved, len(symbols), limit)
 
         if not self._initial_fill_done:
             self._initial_fill_done = True
 
-        # Cleanup old data per interval
+    async def refresh(self) -> None:
+        """Fetch all intervals (used for initial fill only)."""
+        for interval in KLINE_INTERVALS:
+            await self.refresh_interval(interval)
         await self._cleanup_old_data()
 
     async def _cleanup_old_data(self) -> None:
@@ -482,12 +481,45 @@ class KlineScheduler:
             next_run_time=datetime.now() + timedelta(seconds=60),
         )
 
-        # Kline data refresh at every 5-minute mark + 5s (aligned to candle close)
+        # Kline data refresh per interval, aligned to each candle close + 5s
+        # 5m:  every 5 min  → ~545 req/5min  = ~109 req/min
+        # 15m: every 15 min → ~545 req/15min = ~36 req/min
+        # 1h:  every 1 hour → ~545 req/hour
+        # 4h:  every 4 hours
+        # 1d:  every 6 hours
         self._scheduler.add_job(
-            self.refresh,
+            lambda: self.refresh_interval("5m"),
             trigger=CronTrigger(minute="*/5", second=5),
-            id="kline_refresh",
-            name="Fetch kline data",
+            id="kline_refresh_5m",
+            name="Fetch 5m klines",
+            replace_existing=True,
+        )
+        self._scheduler.add_job(
+            lambda: self.refresh_interval("15m"),
+            trigger=CronTrigger(minute="*/15", second=10),
+            id="kline_refresh_15m",
+            name="Fetch 15m klines",
+            replace_existing=True,
+        )
+        self._scheduler.add_job(
+            lambda: self.refresh_interval("1h"),
+            trigger=CronTrigger(minute=0, second=15),
+            id="kline_refresh_1h",
+            name="Fetch 1h klines",
+            replace_existing=True,
+        )
+        self._scheduler.add_job(
+            lambda: self.refresh_interval("4h"),
+            trigger=CronTrigger(hour="*/4", minute=0, second=20),
+            id="kline_refresh_4h",
+            name="Fetch 4h klines",
+            replace_existing=True,
+        )
+        self._scheduler.add_job(
+            lambda: self.refresh_interval("1d"),
+            trigger=CronTrigger(hour="*/6", minute=0, second=25),
+            id="kline_refresh_1d",
+            name="Fetch 1d klines",
             replace_existing=True,
         )
 
