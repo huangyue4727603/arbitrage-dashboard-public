@@ -167,10 +167,10 @@ export default function NewListing() {
   ];
 
   return (
-    <Card title="新上线币种" extra={
-      <Space>
+    <Card title={<span style={{ fontSize: 16, fontWeight: 600 }}>新上线币种</span>} extra={
+      <Space align="center">
         {lastUpdate && <span style={{ color: '#999', fontSize: 12 }}>更新时间：{lastUpdate}</span>}
-        <Button icon={<ReloadOutlined />} onClick={loadData} loading={loading}>刷新</Button>
+        <Button size="small" icon={<ReloadOutlined />} onClick={loadData} loading={loading}>刷新</Button>
       </Space>
     }>
       <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>

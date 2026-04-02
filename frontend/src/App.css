@@ -8,6 +8,43 @@ body {
   min-height: 100vh;
 }
 
+/* Card styling */
+.ant-card {
+  border-radius: 8px !important;
+}
+
+.ant-card-head {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Table styling */
+.ant-table {
+  border-radius: 8px !important;
+}
+
+.ant-table-thead > tr > th {
+  font-weight: 600 !important;
+}
+
+.ant-table-cell {
+  white-space: nowrap;
+}
+
+/* Tabs styling */
+.ant-tabs-nav {
+  margin-bottom: 16px !important;
+}
+
+.ant-tabs-tab {
+  padding: 8px 20px !important;
+  font-size: 14px !important;
+}
+
+/* Filter row alignment */
+.ant-row {
+  align-items: center;
+}
+
 /* NProgress top loading bar */
 #nprogress {
   pointer-events: none;

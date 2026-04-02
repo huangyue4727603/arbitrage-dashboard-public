@@ -143,18 +143,19 @@ export default function FundingRank() {
 
   return (
     <Card
-      title="资费排行"
+      title={<span style={{ fontSize: 16, fontWeight: 600 }}>资费排行</span>}
       extra={
-        <Space>
+        <Space align="center">
           {lastUpdate && (
             <Text type="secondary" style={{ fontSize: 12 }}>
               更新时间: {lastUpdate}
             </Text>
           )}
-          <Button icon={<ReloadOutlined />} onClick={fetchRankings} loading={loading}>
+          <Button size="small" icon={<ReloadOutlined />} onClick={fetchRankings} loading={loading}>
             刷新
           </Button>
           <Button
+            size="small"
             type="primary"
             icon={<CalculatorOutlined />}
             onClick={() => { setCalcInitial(undefined); setCalcOpen(true); }}

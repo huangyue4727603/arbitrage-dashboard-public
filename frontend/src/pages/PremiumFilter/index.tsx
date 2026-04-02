@@ -177,11 +177,11 @@ export default function PremiumFilter() {
 
   return (
     <Card
-      title="大额基差"
+      title={<span style={{ fontSize: 16, fontWeight: 600 }}>大额基差</span>}
       extra={
-        <Space>
+        <Space align="center">
           {lastUpdate && <span style={{ color: '#999', fontSize: 12 }}>更新时间：{lastUpdate}</span>}
-          <Button icon={<ReloadOutlined />} onClick={handleQuery} loading={loading}>刷新</Button>
+          <Button size="small" icon={<ReloadOutlined />} onClick={handleQuery} loading={loading}>刷新</Button>
         </Space>
       }
     >

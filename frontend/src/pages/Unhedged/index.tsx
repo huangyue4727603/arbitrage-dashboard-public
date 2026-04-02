@@ -262,11 +262,11 @@ export default function Unhedged() {
 
   return (
     <Card
-      title="非对冲机会"
+      title={<span style={{ fontSize: 16, fontWeight: 600 }}>非对冲机会</span>}
       extra={
-        <Space>
+        <Space align="center">
           {lastUpdate && <span style={{ color: '#999', fontSize: 12 }}>更新时间：{lastUpdate}</span>}
-          <Button icon={<ReloadOutlined />} onClick={fetchData} loading={loading}>
+          <Button size="small" icon={<ReloadOutlined />} onClick={fetchData} loading={loading}>
             刷新
           </Button>
         </Space>

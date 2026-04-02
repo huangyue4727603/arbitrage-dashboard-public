@@ -63,13 +63,25 @@ export default function Layout() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 24px',
+          padding: '0 32px',
+          position: 'sticky',
+          top: 0,
+          zIndex: 100,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
         }}
       >
-        <div style={{ color: '#fff', fontSize: 18, fontWeight: 600 }}>
-          Arbitrage Dashboard
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="logo" style={{ width: 32, height: 32 }} />
+          <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
+            <span style={{ color: '#fff', fontSize: 20, fontWeight: 700, letterSpacing: 1 }}>
+              诸葛信号看板
+            </span>
+            <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10, fontStyle: 'italic', textAlign: 'right' }}>
+              臣本散户，躬耕于K线，苟全仓位于乱市，但求套利于价差
+            </span>
+          </div>
         </div>
-        <Space>
+        <Space size={12}>
           <ThemeSwitch />
           {isLoggedIn ? (
             <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
@@ -89,13 +101,14 @@ export default function Layout() {
           )}
         </Space>
       </Header>
-      <Content style={{ padding: '16px 24px' }}>
+      <Content style={{ padding: '20px 32px', maxWidth: 1600, margin: '0 auto', width: '100%' }}>
         {isLoggedIn ? (
           <Tabs
             activeKey={activeTab}
             onChange={setActiveTab}
             items={tabItems}
             type="card"
+            size="large"
           />
         ) : (
           <Result

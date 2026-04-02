@@ -111,15 +111,16 @@ export default function PriceTrend() {
 
   return (
     <Card
-      title="价格趋势"
+      title={<span style={{ fontSize: 16, fontWeight: 600 }}>价格趋势</span>}
       extra={
-        <Space>
+        <Space align="center">
           {lastRefresh && (
             <Text type="secondary" style={{ fontSize: 12 }}>
               最后更新: {lastRefresh}
             </Text>
           )}
           <Button
+            size="small"
             icon={<ReloadOutlined />}
             onClick={handleRefresh}
             loading={loading}

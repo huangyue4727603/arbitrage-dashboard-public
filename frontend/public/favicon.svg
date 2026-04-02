@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <radialGradient id="featherGrad" cx="50%" cy="80%" r="70%">
+      <stop offset="0%" stop-color="#FFFDE7"/>
+      <stop offset="40%" stop-color="#F5E6C8"/>
+      <stop offset="100%" stop-color="#C8A96E"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Central feather (tallest) -->
+  <ellipse cx="64" cy="38" rx="5.5" ry="32" fill="#F5E6C8" transform="rotate(0,64,68)"/>
+  <line x1="64" y1="6" x2="64" y2="68" stroke="#B8943F" stroke-width="0.6" opacity="0.4"/>
+
+  <!-- Left feathers -->
+  <ellipse cx="64" cy="38" rx="5" ry="30" fill="#EDE0C8" transform="rotate(-12,64,68)"/>
+  <ellipse cx="64" cy="38" rx="5" ry="30" fill="#EDE0C8" opacity="0.95" transform="rotate(-12,64,68)"/>
+
+  <ellipse cx="64" cy="40" rx="4.8" ry="27" fill="#E8D8BC" transform="rotate(-24,64,68)"/>
+
+  <ellipse cx="64" cy="42" rx="4.5" ry="24" fill="#E0CEAE" transform="rotate(-36,64,68)"/>
+
+  <ellipse cx="64" cy="44" rx="4.2" ry="21" fill="#D6C2A0" transform="rotate(-48,64,68)"/>
+
+  <ellipse cx="64" cy="46" rx="3.8" ry="18" fill="#CCBA98" transform="rotate(-58,64,68)"/>
+
+  <!-- Right feathers (mirror) -->
+  <ellipse cx="64" cy="38" rx="5" ry="30" fill="#EDE0C8" transform="rotate(12,64,68)"/>
+
+  <ellipse cx="64" cy="40" rx="4.8" ry="27" fill="#E8D8BC" transform="rotate(24,64,68)"/>
+
+  <ellipse cx="64" cy="42" rx="4.5" ry="24" fill="#E0CEAE" transform="rotate(36,64,68)"/>
+
+  <ellipse cx="64" cy="44" rx="4.2" ry="21" fill="#D6C2A0" transform="rotate(48,64,68)"/>
+
+  <ellipse cx="64" cy="46" rx="3.8" ry="18" fill="#CCBA98" transform="rotate(58,64,68)"/>
+
+  <!-- Feather vein lines (subtle) -->
+  <g stroke="#B8943F" stroke-width="0.4" opacity="0.25">
+    <line x1="64" y1="8" x2="64" y2="66" transform="rotate(-12,64,68)"/>
+    <line x1="64" y1="12" x2="64" y2="66" transform="rotate(-24,64,68)"/>
+    <line x1="64" y1="16" x2="64" y2="66" transform="rotate(-36,64,68)"/>
+    <line x1="64" y1="20" x2="64" y2="66" transform="rotate(-48,64,68)"/>
+    <line x1="64" y1="8" x2="64" y2="66" transform="rotate(12,64,68)"/>
+    <line x1="64" y1="12" x2="64" y2="66" transform="rotate(24,64,68)"/>
+    <line x1="64" y1="16" x2="64" y2="66" transform="rotate(36,64,68)"/>
+    <line x1="64" y1="20" x2="64" y2="66" transform="rotate(48,64,68)"/>
+  </g>
+
+  <!-- Handle -->
+  <rect x="61.5" y="66" width="5" height="24" rx="2.5" fill="#6B4C2A"/>
+  <rect x="62.2" y="66" width="1.2" height="24" rx="0.6" fill="#8B6914" opacity="0.3"/>
+
+  <!-- Handle binding rings -->
+  <rect x="60" y="68" width="8" height="2.5" rx="1" fill="#B8943F"/>
+  <rect x="60.5" y="78" width="7" height="2" rx="1" fill="#B8943F" opacity="0.7"/>
+
+  <!-- Pivot ornament -->
+  <circle cx="64" cy="67.5" r="3.5" fill="#C8A96E" stroke="#8B6914" stroke-width="0.8"/>
+  <circle cx="64" cy="67.5" r="1.5" fill="#F0D78C"/>
+</svg>

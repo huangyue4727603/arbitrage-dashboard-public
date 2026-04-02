@@ -243,15 +243,17 @@ export default function BasisMonitor() {
   );
 
   return (
-    <Card>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <Space>
-          <Typography.Title level={4} style={{ margin: 0 }}>基差监控</Typography.Title>
+    <Card
+      title={
+        <Space align="center" size={12}>
+          <span style={{ fontSize: 16, fontWeight: 600 }}>基差监控</span>
           {lastUpdate && <Text type="secondary" style={{ fontSize: 12 }}>更新时间：{lastUpdate}</Text>}
           <Text type="secondary" style={{ fontSize: 12 }}>
             阈值: {config.basis_threshold}% | 倍数: {config.expand_multiplier}x
           </Text>
         </Space>
+      }
+      extra={
         <Space>
           <Popover
             content={configContent}
@@ -260,9 +262,9 @@ export default function BasisMonitor() {
             open={configOpen}
             onOpenChange={setConfigOpen}
           >
-            <Button icon={<SettingOutlined />}>配置</Button>
+            <Button size="small" icon={<SettingOutlined />}>配置</Button>
           </Popover>
-          <Button icon={<ReloadOutlined />} onClick={async () => {
+          <Button size="small" icon={<ReloadOutlined />} onClick={async () => {
             NProgress.start();
             try {
               const data = await basisMonitorApi.refresh();
@@ -272,10 +274,10 @@ export default function BasisMonitor() {
             } catch { message.error('刷新失败'); }
             finally { NProgress.done(); }
           }}>刷新</Button>
-          <Button icon={<ClearOutlined />} onClick={handleClear} danger>清除</Button>
+          <Button size="small" icon={<ClearOutlined />} onClick={handleClear} danger>清除</Button>
         </Space>
-      </div>
-
+      }
+    >
       <Row gutter={24}>
         {/* Left: Alert Table */}
         <Col span={14}>
@@ -293,7 +295,8 @@ export default function BasisMonitor() {
 
         {/* Right: Timeline */}
         <Col span={10}>
-          <div style={{ height: 'calc(100vh - 280px)', overflowY: 'auto', padding: '0 8px', borderLeft: '1px solid #f0f0f0', paddingLeft: 16 }}>
+          <Text strong style={{ display: 'block', marginBottom: 12 }}>预警动态</Text>
+          <div style={{ height: 'calc(100vh - 320px)', overflowY: 'auto', paddingRight: 8, borderLeft: '1px solid #f0f0f0', paddingLeft: 16 }}>
             {timeline.length === 0 ? (
               <div style={{ color: '#999', textAlign: 'center', padding: 40 }}>暂无动态</div>
             ) : (

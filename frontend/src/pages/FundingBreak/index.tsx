@@ -257,12 +257,12 @@ export default function FundingBreak() {
 
   return (
     <Card
-      title="资费突破"
+      title={<span style={{ fontSize: 16, fontWeight: 600 }}>资费突破</span>}
       extra={
-        <Space size={16}>
+        <Space align="center">
           {updateTime && <span style={{ color: '#999', fontSize: 12 }}>更新时间：{updateTime}</span>}
           <span style={{ color: '#999', fontSize: 12 }}>共 {data.length} 个币种，{breakingCount} 个突破</span>
-          <Button icon={<ReloadOutlined />} onClick={async () => { const res = await fundingBreakApi.getBreakingCoins(); setData(transformData(res.data)); markUpdateTime(); }} loading={loading}>刷新</Button>
+          <Button size="small" icon={<ReloadOutlined />} onClick={async () => { const res = await fundingBreakApi.getBreakingCoins(); setData(transformData(res.data)); markUpdateTime(); }} loading={loading}>刷新</Button>
         </Space>
       }
     >
