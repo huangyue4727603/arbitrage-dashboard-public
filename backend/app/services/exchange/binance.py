@@ -157,6 +157,11 @@ class BinanceClient:
         result = await self._request("GET", "/fapi/v2/ticker/price", timeout=timeout)
         return result if isinstance(result, list) else []
 
+    async def get_index_constituents(self, symbol: str, timeout: Optional[int] = None) -> dict[str, Any]:
+        """GET /fapi/v1/constituents?symbol=BTCUSDT — index price spot constituents."""
+        result = await self._request("GET", "/fapi/v1/constituents", params={"symbol": symbol}, timeout=timeout)
+        return result if isinstance(result, dict) else {}
+
     async def get_24hr_ticker(
         self,
         symbol: Optional[str] = None,

@@ -60,7 +60,7 @@ class OISnapshotScheduler:
         if not monitors:
             return
 
-        now = datetime.utcnow()
+        now = datetime.now()
         timeout = aiohttp.ClientTimeout(total=15)
 
         # Fetch OI once per unique symbol

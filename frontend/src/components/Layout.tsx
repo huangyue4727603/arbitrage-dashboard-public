@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Layout as AntLayout, Button, Dropdown, Space, Tabs, Result } from 'antd';
+import { Layout as AntLayout, Button, Dropdown, Space, Tabs, Result, theme as antTheme } from 'antd';
+import { useThemeStore } from '../stores/themeStore';
 import { LockOutlined } from '@ant-design/icons';
 import { UserOutlined, LogoutOutlined } from '@ant-design/icons';
 import ThemeSwitch from './ThemeSwitch';
@@ -35,6 +36,9 @@ export default function Layout() {
   const { openLoginModal, openRegisterModal } = useAuthStore();
   const logout = useAuthStore((s) => s.logout);
   const [activeTab, setActiveTab] = useState('fundingRank');
+  const { theme: themeMode } = useThemeStore();
+  const isDark = themeMode === 'dark';
+  const { token: tk } = antTheme.useToken();
 
   useWebSocket(token);
 
@@ -57,58 +61,78 @@ export default function Layout() {
   ];
 
   return (
-    <AntLayout style={{ minHeight: '100vh' }}>
+    <AntLayout style={{ minHeight: '100vh', background: tk.colorBgLayout }}>
       <Header
+        className="app-header"
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '0 32px',
+          height: 64,
+          lineHeight: '64px',
           position: 'sticky',
           top: 0,
           zIndex: 100,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          background: isDark ? 'rgba(11,14,17,0.92)' : 'rgba(255,255,255,0.92)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="logo" style={{ width: 32, height: 32 }} />
-          <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
-            <span style={{ color: '#fff', fontSize: 20, fontWeight: 700, letterSpacing: 1 }}>
-              诸葛信号看板
-            </span>
-            <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10, fontStyle: 'italic', textAlign: 'right' }}>
-              臣本散户，躬耕于K线，苟全仓位于乱市，但求套利于价差
-            </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
+          <span
+            className="brand-title"
+            style={{
+              fontSize: 24,
+              fontWeight: 800,
+              letterSpacing: 0.6,
+              fontFamily: '"Playfair Display", "Cormorant Garamond", "Times New Roman", Georgia, serif',
+              fontStyle: 'italic',
+              background: isDark
+                ? 'linear-gradient(135deg, #FFFFFF 0%, #F0B90B 50%, #FFFFFF 100%)'
+                : 'linear-gradient(135deg, #1E2329 0%, #C99400 50%, #1E2329 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+              backgroundSize: '200% auto',
+              animation: 'shimmer 6s linear infinite',
+              lineHeight: 1.1,
+            }}
+          >
+            Crypto Arbitrage
+          </span>
+          <div className="live-badge">
+            <span className="live-dot" />
+            <span className="live-text">LIVE</span>
           </div>
         </div>
-        <Space size={12}>
+        <Space size={10}>
           <ThemeSwitch />
           {isLoggedIn ? (
             <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
-              <Button type="text" icon={<UserOutlined />} style={{ color: '#fff' }}>
+              <Button
+                type="text"
+                icon={<UserOutlined />}
+                style={{ fontWeight: 500, height: 36, padding: '0 12px' }}
+              >
                 {user?.username || '用户'}
               </Button>
             </Dropdown>
           ) : (
-            <Space>
-              <Button type="text" style={{ color: '#fff' }} onClick={openLoginModal}>
-                登录
-              </Button>
-              <Button type="primary" ghost onClick={openRegisterModal}>
+            <Space size={6}>
+              <Button type="text" onClick={openLoginModal} style={{ height: 36 }}>登录</Button>
+              <Button type="primary" onClick={openRegisterModal} style={{ height: 36, fontWeight: 600 }}>
                 注册
               </Button>
             </Space>
           )}
         </Space>
       </Header>
-      <Content style={{ padding: '20px 32px', maxWidth: 1600, margin: '0 auto', width: '100%' }}>
+      <Content style={{ padding: '0 24px 20px', maxWidth: 1600, margin: '0 auto', width: '100%' }}>
         {isLoggedIn ? (
           <Tabs
             activeKey={activeTab}
             onChange={setActiveTab}
             items={tabItems}
-            type="card"
-            size="large"
+            size="middle"
           />
         ) : (
           <Result

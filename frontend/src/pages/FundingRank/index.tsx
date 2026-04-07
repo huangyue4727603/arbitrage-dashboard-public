@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Card, DatePicker, Button, Space, message, Select, InputNumber, Row, Col, Typography } from 'antd';
-import { CalculatorOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Card, DatePicker, Button, Space, message, Select, InputNumber, Row, Col, Typography, Input } from 'antd';
+import { CalculatorOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
 import { fundingApi, type RankItem, type RealtimeData } from '../../api/funding';
@@ -44,6 +44,24 @@ export default function FundingRank() {
   const [maxSpread, setMaxSpread] = useState<number | null>(null);
   const [minBasis, setMinBasis] = useState<number | null>(null);
   const [maxBasis, setMaxBasis] = useState<number | null>(null);
+  const [coinFilter, setCoinFilter] = useState<string>('');
+  const [coinOptions, setCoinOptions] = useState<{ label: string; value: string }[]>([]);
+  const [indexOverlap, setIndexOverlap] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    fundingApi.getCoins().then((list) => {
+      setCoinOptions(list.map((c) => ({ label: c, value: c })));
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const fetchOverlap = () => {
+      fundingApi.getIndexOverlap().then(setIndexOverlap).catch(() => {});
+    };
+    fetchOverlap();
+    const timer = setInterval(fetchOverlap, 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Calculator modal state
   const [calcOpen, setCalcOpen] = useState(false);
@@ -105,15 +123,18 @@ export default function FundingRank() {
       const key = `${item.coin}_${item.long_exchange}_${item.short_exchange}`;
       const rt = realtimeData[key];
       const pc = priceChanges[item.coin];
+      const overlapKey = `${item.coin}_${item.long_exchange}_${item.short_exchange}`;
       return {
         ...item,
         current_spread: rt?.spread ?? item.current_spread,
         current_basis: rt?.basis ?? item.current_basis,
         change_1d: pc?.change_1d,
         change_3d: pc?.change_3d,
+        index_overlap: indexOverlap[overlapKey],
       };
     })
     .filter((item) => {
+      if (coinFilter && item.coin !== coinFilter) return false;
       if (longExchange && item.long_exchange !== longExchange) return false;
       if (shortExchange && item.short_exchange !== shortExchange) return false;
       if (longPeriods.length > 0 && !longPeriods.includes(item.long_settlement_period)) return false;
@@ -211,14 +232,31 @@ export default function FundingRank() {
           </Space>
         </Col>
         <Col>
-          <Button onClick={fetchRankings} loading={loading}>
+          <Button type="primary" icon={<SearchOutlined />} onClick={fetchRankings} loading={loading}>
             查询
           </Button>
         </Col>
       </Row>
 
-      {/* Filter row 2: Period + Spread + Basis */}
+      {/* Filter row 2: Period + Spread + Basis + Coin */}
       <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
+        <Col>
+          <Space size={4}>
+            <span>币种：</span>
+            <Select
+              showSearch
+              allowClear
+              value={coinFilter || undefined}
+              onChange={(v) => setCoinFilter(v || '')}
+              options={coinOptions}
+              placeholder="搜索币种"
+              style={{ width: 130 }}
+              filterOption={(input, option) =>
+                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+            />
+          </Space>
+        </Col>
         <Col>
           <Space size={4}>
             <span>做多结算周期：</span>

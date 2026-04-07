@@ -17,6 +17,8 @@ export interface RankItem {
   // Price change fields (merged from /price-changes endpoint)
   change_1d?: number;
   change_3d?: number;
+  // Index constituent overlap (0..1) for this (coin, long, short) combo
+  index_overlap?: number;
 }
 
 export interface RealtimeData {
@@ -103,6 +105,11 @@ export const fundingApi = {
 
   getCoins: async (): Promise<string[]> => {
     const res = await client.get('/api/funding-rank/coins');
+    return res.data.data;
+  },
+
+  getIndexOverlap: async (): Promise<Record<string, number>> => {
+    const res = await client.get('/api/funding-rank/index-overlap');
     return res.data.data;
   },
 

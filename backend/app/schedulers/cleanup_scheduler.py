@@ -23,7 +23,7 @@ class CleanupScheduler:
         """Run all cleanup tasks."""
         async with async_session_factory() as db:
             try:
-                now = datetime.utcnow()
+                now = datetime.now()
 
                 # 1. basis_alert_history: keep 30 days
                 cutoff_30d = now - timedelta(days=30)

@@ -149,6 +149,36 @@ async def get_price_changes():
     return {"data": kline_scheduler.get_price_changes()}
 
 
+@router.get("/index-overlap")
+async def get_index_overlap():
+    """Return index-constituent overlap percentage for every (coin, long_ex, short_ex) combo.
+
+    Computed in SQL: for each (coin, ex_a, ex_b) pair, sum LEAST(weight_a, weight_b)
+    over shared spot_exchange names. Result is 0..1.
+
+    Response: {"BTC_BN_OKX": 0.55, "BTC_OKX_BN": 0.55, ...}
+    """
+    from sqlalchemy import text
+    from app.database import async_session_factory
+
+    sql = text("""
+        SELECT a.coin, a.exchange AS ex_a, b.exchange AS ex_b,
+               SUM(LEAST(a.weight, b.weight)) AS overlap
+        FROM arb_index_constituents a
+        JOIN arb_index_constituents b
+          ON a.coin = b.coin
+         AND a.exchange <> b.exchange
+         AND LOWER(a.spot_exchange) = LOWER(b.spot_exchange)
+        GROUP BY a.coin, a.exchange, b.exchange
+    """)
+    out: dict = {}
+    async with async_session_factory() as db:
+        r = await db.execute(sql)
+        for coin, ex_a, ex_b, overlap in r.all():
+            out[f"{coin}_{ex_a}_{ex_b}"] = round(float(overlap or 0), 4)
+    return {"data": out}
+
+
 @router.get("/coins")
 async def get_coins():
     """Get list of all coins available in funding history."""

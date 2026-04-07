@@ -120,3 +120,32 @@ class FundingHistory(Base):
         Index("ix_funding_history_exchange_coin", "exchange", "coin"),
         Index("ix_funding_history_time", "funding_time"),
     )
+
+
+class IndexConstituent(Base):
+    """One row per (coin, derivative_exchange, spot_exchange) — the actual
+    weight a spot exchange contributes to the index price for a coin's
+    perpetual contract on a given derivatives exchange.
+
+    Example: BTC perp on Binance uses Coinbase BTC-USD with weight 0.25 →
+        coin=BTC, exchange=BN, spot_exchange=Coinbase, spot_symbol=BTC-USD, weight=0.25
+    """
+    __tablename__ = "arb_index_constituents"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    coin: Mapped[str] = mapped_column(String(50), nullable=False)
+    exchange: Mapped[str] = mapped_column(String(10), nullable=False)  # BN / OKX / BY
+    spot_exchange: Mapped[str] = mapped_column(String(50), nullable=False)
+    spot_symbol: Mapped[str] = mapped_column(String(50), nullable=False, default="")
+    weight: Mapped[float] = mapped_column(Float, nullable=False)
+    fetched_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False,
+        default=datetime.now,
+        onupdate=datetime.now,
+    )
+
+    __table_args__ = (
+        UniqueConstraint("coin", "exchange", "spot_exchange", name="uq_index_constituents_coin_ex_spot"),
+        Index("ix_index_constituents_coin", "coin"),
+        Index("ix_index_constituents_coin_ex", "coin", "exchange"),
+    )

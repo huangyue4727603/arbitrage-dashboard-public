@@ -125,7 +125,7 @@ async def get_premium_filter(
             return {"data": []}
 
         # Parallel: funding query + settlement periods + basis
-        start_time = datetime.utcfromtimestamp(ts / 1000)
+        start_time = datetime.fromtimestamp(ts / 1000)
         coin_names = [c["coin_name"] for c in coins]
 
         async def get_funding() -> Dict[str, float]:

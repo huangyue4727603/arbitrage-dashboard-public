@@ -173,5 +173,17 @@ class OKXClient:
         return result if isinstance(result, list) else []
 
 
+    async def get_index_components(self, index: str, timeout: Optional[int] = None) -> dict[str, Any]:
+        """GET /api/v5/market/index-components?index=BTC-USDT — spot index constituents."""
+        result = await self._request(
+            "GET", "/api/v5/market/index-components", params={"index": index}, timeout=timeout
+        )
+        if isinstance(result, list) and result:
+            return result[0]
+        if isinstance(result, dict):
+            return result
+        return {}
+
+
 # Module-level singleton instance
 okx_client = OKXClient()

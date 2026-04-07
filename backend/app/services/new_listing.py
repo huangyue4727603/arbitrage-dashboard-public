@@ -46,7 +46,7 @@ class NewListingService:
                     symbol = f"{coin_name}USDT"
                     listing_time = None
                     if item.get("listing_time_ms"):
-                        listing_time = datetime.utcfromtimestamp(item["listing_time_ms"] / 1000)
+                        listing_time = datetime.fromtimestamp(item["listing_time_ms"] / 1000)
 
                     stmt = mysql_insert(NewListing).values(
                         exchange=exchange.upper(),

@@ -296,7 +296,7 @@ export default function BasisMonitor() {
         {/* Right: Timeline */}
         <Col span={10}>
           <Text strong style={{ display: 'block', marginBottom: 12 }}>预警动态</Text>
-          <div style={{ height: 'calc(100vh - 320px)', overflowY: 'auto', paddingRight: 8, borderLeft: '1px solid #f0f0f0', paddingLeft: 16 }}>
+          <div style={{ maxHeight: 'calc(100vh - 320px)', overflowY: 'auto', paddingRight: 8, borderLeft: '1px solid #f0f0f0', paddingLeft: 16 }}>
             {timeline.length === 0 ? (
               <div style={{ color: '#999', textAlign: 'center', padding: 40 }}>暂无动态</div>
             ) : (

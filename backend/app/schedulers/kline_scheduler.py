@@ -110,7 +110,7 @@ class KlineScheduler:
         }
 
         for interval, required_hours in REQUIRED_HISTORY.items():
-            cutoff = datetime.utcnow() - timedelta(hours=required_hours)
+            cutoff = datetime.now() - timedelta(hours=required_hours)
             min_count = expected_counts.get(interval, 1)
 
             try:
@@ -182,7 +182,7 @@ class KlineScheduler:
 
                     async with async_session_factory() as db:
                         for k in klines:
-                            kline_time = datetime.utcfromtimestamp(int(k[0]) / 1000)
+                            kline_time = datetime.fromtimestamp(int(k[0]) / 1000)
                             stmt = mysql_insert(PriceKline).values(
                                 symbol=symbol,
                                 interval_type=interval,
@@ -257,7 +257,7 @@ class KlineScheduler:
                     count = 0
                     async with async_session_factory() as db:
                         for k in klines:
-                            kline_time = datetime.utcfromtimestamp(int(k[0]) / 1000)
+                            kline_time = datetime.fromtimestamp(int(k[0]) / 1000)
                             stmt = mysql_insert(PriceKline).values(
                                 symbol=symbol,
                                 interval_type=interval,
@@ -302,7 +302,7 @@ class KlineScheduler:
         async with async_session_factory() as db:
             try:
                 for interval, config in KLINE_INTERVALS.items():
-                    cutoff = datetime.utcnow() - timedelta(hours=config["retention_hours"])
+                    cutoff = datetime.now() - timedelta(hours=config["retention_hours"])
                     await db.execute(
                         delete(PriceKline)
                         .where(PriceKline.interval_type == interval)
@@ -341,9 +341,58 @@ class KlineScheduler:
             except Exception as exc:
                 logger.error("Failed to fetch 24hr ticker: %s", exc)
 
+            # --- 1d fallback: from DB 1h klines (when ticker API failed) ---
+            try:
+                now = datetime.now()
+                t_1d = now - timedelta(hours=24)
+                async with async_session_factory() as db:
+                    latest_1h_subq = (
+                        select(PriceKline.symbol, func.max(PriceKline.kline_time).label("mt"))
+                        .where(PriceKline.interval_type == "1h")
+                        .group_by(PriceKline.symbol)
+                        .subquery()
+                    )
+                    latest_1h = await db.execute(
+                        select(PriceKline.symbol, PriceKline.close_price)
+                        .join(latest_1h_subq, (PriceKline.symbol == latest_1h_subq.c.symbol) &
+                              (PriceKline.kline_time == latest_1h_subq.c.mt))
+                        .where(PriceKline.interval_type == "1h")
+                    )
+                    latest_1h_prices = {row[0]: row[1] for row in latest_1h.all()}
+
+                    lo, hi = t_1d - timedelta(hours=2), t_1d + timedelta(hours=2)
+                    subq_1d = (
+                        select(PriceKline.symbol, func.max(PriceKline.kline_time).label("nt"))
+                        .where(PriceKline.interval_type == "1h")
+                        .where(PriceKline.kline_time.between(lo, hi))
+                        .group_by(PriceKline.symbol)
+                        .subquery()
+                    )
+                    res_1d = await db.execute(
+                        select(PriceKline.symbol, PriceKline.close_price)
+                        .where(PriceKline.interval_type == "1h")
+                        .join(subq_1d, (PriceKline.symbol == subq_1d.c.symbol) &
+                              (PriceKline.kline_time == subq_1d.c.nt))
+                    )
+                    prices_1d = {row[0]: row[1] for row in res_1d.all()}
+
+                added = 0
+                for symbol, current in latest_1h_prices.items():
+                    coin = symbol[:-4] if symbol.endswith("USDT") else symbol
+                    if coin in changes and "change_1d" in changes[coin]:
+                        continue
+                    old_1d = prices_1d.get(symbol)
+                    if old_1d and old_1d > 0:
+                        c1d = round((current - old_1d) / old_1d * 100, 2)
+                        changes.setdefault(coin, {})["change_1d"] = c1d
+                        added += 1
+                logger.info("1d price changes from DB fallback: %d coins", added)
+            except Exception as exc:
+                logger.error("Failed to compute 1d fallback: %s", exc)
+
             # --- 3d: from DB 1d klines ---
             try:
-                now = datetime.utcnow()
+                now = datetime.now()
                 t_3d = now - timedelta(hours=72)
 
                 async with async_session_factory() as db:
@@ -404,7 +453,7 @@ class KlineScheduler:
     async def refresh_funding_cumulative(self) -> None:
         """Compute 1d/3d cumulative funding rates from DB (per coin+exchange)."""
         try:
-            now = datetime.utcnow()
+            now = datetime.now()
             t_1d = now - timedelta(hours=24)
             t_3d = now - timedelta(hours=72)
 

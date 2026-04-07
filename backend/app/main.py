@@ -25,6 +25,7 @@ from app.schedulers.oi_snapshot_scheduler import oi_snapshot_scheduler
 from app.schedulers.kline_scheduler import kline_scheduler
 from app.schedulers.cleanup_scheduler import cleanup_scheduler
 from app.schedulers.basis_alert_scheduler import basis_alert_scheduler
+from app.schedulers.index_constituents_scheduler import index_constituents_scheduler
 
 # Import all models so they are registered with Base.metadata
 import app.models  # noqa: F401
@@ -61,7 +62,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     kline_scheduler.start()
     basis_alert_scheduler.start()
     cleanup_scheduler.start()
+    index_constituents_scheduler.start()
+    # Preload caches so first page load isn't empty
+    import asyncio as _asyncio
+    _asyncio.create_task(kline_scheduler.refresh_price_changes())
+    _asyncio.create_task(kline_scheduler.refresh_funding_cumulative())
     yield
+    index_constituents_scheduler.stop()
     cleanup_scheduler.stop()
     basis_alert_scheduler.stop()
     kline_scheduler.stop()
