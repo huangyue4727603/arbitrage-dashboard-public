@@ -1,5 +1,6 @@
 from datetime import datetime
-from sqlalchemy import String, Integer, Float, Boolean, DateTime, JSON, Index, UniqueConstraint, text
+from decimal import Decimal
+from sqlalchemy import String, Integer, BigInteger, Float, Boolean, DateTime, JSON, Index, UniqueConstraint, Numeric, text
 from sqlalchemy.orm import Mapped, mapped_column
 from typing import Optional
 
@@ -148,4 +149,35 @@ class IndexConstituent(Base):
         UniqueConstraint("coin", "exchange", "spot_exchange", name="uq_index_constituents_coin_ex_spot"),
         Index("ix_index_constituents_coin", "coin"),
         Index("ix_index_constituents_coin_ex", "coin", "exchange"),
+    )
+
+
+class MarketHistory(Base):
+    """Snapshot rows from /api/v1/arbitrage/chance/histories — one row per
+    (coin, exchange, instrument) per ms tick. Retained for 3 days.
+    """
+    __tablename__ = "arb_market_history"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    seq_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    exchange: Mapped[str] = mapped_column(String(20), nullable=False)
+    coin: Mapped[str] = mapped_column(String(50), nullable=False)
+    symbol: Mapped[str] = mapped_column(String(80), nullable=False)
+    inst_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    inst_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    price: Mapped[Optional[Decimal]] = mapped_column(Numeric(28, 10), nullable=True)
+    funding_rate: Mapped[Optional[Decimal]] = mapped_column(Numeric(20, 10), nullable=True)
+    premium: Mapped[Optional[Decimal]] = mapped_column(Numeric(20, 10), nullable=True)
+    open_interest: Mapped[Optional[Decimal]] = mapped_column(Numeric(28, 8), nullable=True)
+    funding_interval: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    base_vol24h: Mapped[Optional[Decimal]] = mapped_column(Numeric(28, 8), nullable=True)
+    quote_vol24h: Mapped[Optional[Decimal]] = mapped_column(Numeric(28, 8), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("seq_id", "inst_id", name="uq_market_history_seq_inst"),
+        Index("ix_market_history_created_at", "created_at"),
+        Index("ix_market_history_coin_created", "coin", "created_at"),
+        Index("ix_market_history_inst_created", "inst_id", "created_at"),
+        Index("ix_market_history_seq", "seq_id"),
     )
