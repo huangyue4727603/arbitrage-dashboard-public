@@ -114,18 +114,13 @@ export default function FundingRank() {
     return () => clearInterval(timer);
   }, []);
 
-  // Independent rankings for KPI cards 3 & 4 (not tied to user filter)
-  const [lastHourData, setLastHourData] = useState<RankItem[]>([]);
+  // Independent rankings for KPI card (24h, not tied to user filter)
   const [last24hData, setLast24hData] = useState<RankItem[]>([]);
   useEffect(() => {
     const fetchKpiRanges = async () => {
       const now = Date.now();
       try {
-        const [h8, h24] = await Promise.all([
-          fundingApi.getRankings(now - 8 * 60 * 60 * 1000, now),
-          fundingApi.getRankings(now - 24 * 60 * 60 * 1000, now),
-        ]);
-        setLastHourData(h8.data);
+        const h24 = await fundingApi.getRankings(now - 24 * 60 * 60 * 1000, now);
         setLast24hData(h24.data);
       } catch {
         // silent
@@ -194,33 +189,31 @@ export default function FundingRank() {
       }
     }
 
-    // Card 2: 1d 最大涨幅
+    // Card 2: 1D 最大涨幅 (从排行榜币种中选)
     let maxChange1d: { coin: string; value: number } | null = null;
-    for (const coin of Object.keys(priceChanges)) {
-      const v = priceChanges[coin]?.change_1d;
+    const seenCoins = new Set<string>();
+    for (const item of rankings) {
+      if (seenCoins.has(item.coin)) continue;
+      seenCoins.add(item.coin);
+      const v = priceChanges[item.coin]?.change_1d;
       if (v === undefined || v === null) continue;
       if (!maxChange1d || v > maxChange1d.value) {
-        maxChange1d = { coin, value: v };
+        maxChange1d = { coin: item.coin, value: v };
       }
     }
 
-    // Card 3: 最近 1h 资费差最多，做空 = BN
-    const pickBestShortBN = (data: RankItem[]) => {
-      let best: { coin: string; value: number; longEx: string } | null = null;
-      for (const item of data) {
-        if (item.short_exchange !== 'BN') continue;
-        const v = item.total_diff ?? 0;
-        if (!best || v > best.value) {
-          best = { coin: item.coin, value: v, longEx: item.long_exchange };
-        }
+    // Card 3: 24H 最大资费差 (做空 BN)
+    let last24hBest: { coin: string; value: number; longEx: string } | null = null;
+    for (const item of last24hData) {
+      if (item.short_exchange !== 'BN') continue;
+      const v = item.total_diff ?? 0;
+      if (!last24hBest || v > last24hBest.value) {
+        last24hBest = { coin: item.coin, value: v, longEx: item.long_exchange };
       }
-      return best;
-    };
-    const lastSettleBest = pickBestShortBN(lastHourData);
-    const last24hBest = pickBestShortBN(last24hData);
+    }
 
-    return { mostNegBasis, maxChange1d, lastSettleBest, last24hBest };
-  }, [rankings, realtimeData, priceChanges, lastHourData, last24hData]);
+    return { mostNegBasis, maxChange1d, last24hBest };
+  }, [rankings, realtimeData, priceChanges, last24hData]);
 
   return (
     <div className={s.page}>
@@ -259,8 +252,8 @@ export default function FundingRank() {
               <div className={s.kpiCoin}>
                 <span className={s.kpiCoinName}>{kpi.maxChange1d.coin}</span>
               </div>
-              <div className={`${s.kpiValue} ${s.kpiValueUp}`}>
-                +{kpi.maxChange1d.value.toFixed(2)}%
+              <div className={`${s.kpiValue} ${kpi.maxChange1d.value >= 0 ? s.kpiValueUp : s.kpiValueDown}`}>
+                {kpi.maxChange1d.value >= 0 ? '+' : ''}{kpi.maxChange1d.value.toFixed(2)}%
               </div>
               <div className={s.kpiMeta}>24 小时涨幅</div>
             </>
@@ -269,32 +262,7 @@ export default function FundingRank() {
           )}
         </div>
 
-        {/* Card 3: 上周期最大资费差 (空 BN) */}
-        <div className={s.kpi}>
-          <div className={s.kpiLabel}>上周期最大资费差</div>
-          {kpi.lastSettleBest ? (
-            <>
-              <div className={s.kpiCoin}>
-                <span className={s.kpiCoinName}>{kpi.lastSettleBest.coin}</span>
-              </div>
-              <div className={`${s.kpiValue} ${kpi.lastSettleBest.value >= 0 ? s.kpiValueUp : s.kpiValueDown}`}>
-                {kpi.lastSettleBest.value >= 0 ? '+' : ''}{kpi.lastSettleBest.value.toFixed(4)}%
-              </div>
-              <div className={s.kpiMeta}>
-                <span className={`${s.kpiSide} ${s.kpiSideUp}`}>
-                  <span className={s.kpiSideArrow}>▲</span>多 {kpi.lastSettleBest.longEx}
-                </span>
-                <span className={`${s.kpiSide} ${s.kpiSideDown}`}>
-                  <span className={s.kpiSideArrow}>▼</span>空 BN
-                </span>
-              </div>
-            </>
-          ) : (
-            <div className={s.kpiEmpty}>暂无数据</div>
-          )}
-        </div>
-
-        {/* Card 4: 24H 最大资费差 (空 BN) */}
+        {/* Card 3: 24H 最大资费差 (空 BN) */}
         <div className={s.kpi}>
           <div className={s.kpiLabel}>24H 最大资费差</div>
           {kpi.last24hBest ? (
