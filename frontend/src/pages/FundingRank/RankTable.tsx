@@ -164,19 +164,6 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
           '-'
         ),
     },
-    {
-      title: '指数交集',
-      dataIndex: 'index_overlap',
-      key: 'index_overlap',
-      width: 90,
-      sorter: (a: any, b: any) => (a.index_overlap ?? -1) - (b.index_overlap ?? -1),
-      render: (val?: number) => {
-        if (val === undefined || val === null) return <span style={{ color: '#d9d9d9' }}>—</span>;
-        const pct = val * 100;
-        const color = pct >= 50 ? '#22AB94' : pct > 0 ? '#9aa0a6' : '#F23645';
-        return <span style={{ color, fontWeight: 600 }}>{pct.toFixed(1)}%</span>;
-      },
-    },
   ];
 
   return (

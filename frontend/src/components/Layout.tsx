@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Layout as AntLayout, Button, Dropdown, Space, Tabs, Result, theme as antTheme } from 'antd';
 import { useThemeStore } from '../stores/themeStore';
-import { LockOutlined } from '@ant-design/icons';
+import { LockOutlined, CalculatorOutlined } from '@ant-design/icons';
 import { UserOutlined, LogoutOutlined } from '@ant-design/icons';
 import ThemeSwitch from './ThemeSwitch';
 import LoginModal from './LoginModal';
@@ -9,6 +9,7 @@ import RegisterModal from './RegisterModal';
 import { useAuth } from '../hooks/useAuth';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useAuthStore } from '../stores/authStore';
+import { useCalculatorStore } from '../stores/calculatorStore';
 import { authApi } from '../api/auth';
 
 import FundingRank from '../pages/FundingRank';
@@ -18,6 +19,7 @@ import PriceTrend from '../pages/PriceTrend';
 import BasisMonitor from '../pages/BasisMonitor';
 import AlertConfig from '../pages/AlertConfig';
 import PremiumFilter from '../pages/PremiumFilter';
+import Calculator from '../pages/FundingRank/Calculator';
 
 const { Header, Content } = AntLayout;
 
@@ -39,6 +41,10 @@ export default function Layout() {
   const { theme: themeMode } = useThemeStore();
   const isDark = themeMode === 'dark';
   const { token: tk } = antTheme.useToken();
+  const calcOpen = useCalculatorStore((s) => s.open);
+  const calcInitial = useCalculatorStore((s) => s.initialValues);
+  const openCalculator = useCalculatorStore((s) => s.openCalculator);
+  const closeCalculator = useCalculatorStore((s) => s.closeCalculator);
 
   useWebSocket(token);
 
@@ -99,12 +105,18 @@ export default function Layout() {
           >
             Crypto Arbitrage
           </span>
-          <div className="live-badge">
-            <span className="live-dot" />
-            <span className="live-text">LIVE</span>
-          </div>
         </div>
         <Space size={10}>
+          {isLoggedIn && (
+            <Button
+              type="text"
+              icon={<CalculatorOutlined />}
+              onClick={() => openCalculator()}
+              style={{ height: 36, fontWeight: 500 }}
+            >
+              资费计算器
+            </Button>
+          )}
           <ThemeSwitch />
           {isLoggedIn ? (
             <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
@@ -150,6 +162,11 @@ export default function Layout() {
       </Content>
       <LoginModal />
       <RegisterModal />
+      <Calculator
+        open={calcOpen}
+        onClose={closeCalculator}
+        initialValues={calcInitial}
+      />
     </AntLayout>
   );
 }

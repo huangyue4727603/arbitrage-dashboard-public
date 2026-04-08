@@ -1,15 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Card, Table, Button, Space, Typography, message } from 'antd';
+import { Table, message } from 'antd';
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
-  ReloadOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { priceTrendApi, type PriceTrendItem } from '../../api/priceTrend';
 import { useWsStore } from '../../stores/wsStore';
-
-const { Text } = Typography;
+import s from '../../styles/page.module.css';
 
 export default function PriceTrend() {
   const [data, setData] = useState<PriceTrendItem[]>([]);
@@ -110,35 +108,23 @@ export default function PriceTrend() {
   ];
 
   return (
-    <Card
-      title={<span style={{ fontSize: 16, fontWeight: 600 }}>价格趋势</span>}
-      extra={
-        <Space align="center">
-          {lastRefresh && (
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              最后更新: {lastRefresh}
-            </Text>
-          )}
-          <Button
-            size="small"
-            icon={<ReloadOutlined />}
-            onClick={handleRefresh}
-            loading={loading}
-          >
-            刷新
-          </Button>
-        </Space>
-      }
-    >
-      <Table<PriceTrendItem>
-        columns={columns}
-        dataSource={data}
-        rowKey="coin_name"
-        loading={loading}
-        size="small"
-        pagination={{ pageSize: 50, showSizeChanger: true, showTotal: (total) => `共 ${total} 条` }}
-        scroll={{ x: 440 }}
-      />
-    </Card>
+    <div className={s.page}>
+      {lastRefresh && (
+        <div className={s.topActions}>
+          <span className={s.updateLabel}>更新 {lastRefresh}</span>
+        </div>
+      )}
+      <div className={s.tableWrap}>
+        <Table<PriceTrendItem>
+          columns={columns}
+          dataSource={data}
+          rowKey="coin_name"
+          loading={loading}
+          size="small"
+          pagination={{ pageSize: 50, showSizeChanger: true, showTotal: (total) => `共 ${total} 条` }}
+          scroll={{ x: 440 }}
+        />
+      </div>
+    </div>
   );
 }

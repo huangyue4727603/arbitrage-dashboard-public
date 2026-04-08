@@ -1,0 +1,338 @@
+/* === Funding Rank — scoped premium layout === */
+/* Design tokens (scoped, do not affect other pages) */
+.page {
+  --gap-1: 4px;
+  --gap-2: 8px;
+  --gap-3: 12px;
+  --gap-4: 16px;
+  --gap-5: 24px;
+  --gap-6: 32px;
+
+  --fs-11: 11px;
+  --fs-12: 12px;
+  --fs-13: 13px;
+  --fs-14: 14px;
+  --fs-16: 16px;
+  --fs-20: 20px;
+  --fs-28: 28px;
+
+  --num-font: "SF Mono", "JetBrains Mono", "Roboto Mono", Menlo, Consolas, monospace;
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-5);
+  padding-bottom: var(--gap-6);
+}
+/* Tab-level floating controls (overlaps tab nav right side) */
+.topActions {
+  position: absolute;
+  top: -52px;
+  right: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 44px;
+  pointer-events: none;
+}
+.topActions > * { pointer-events: auto; }
+.updateLabel {
+  font-size: 12px;
+  color: var(--text-3);
+  font-family: var(--num-font);
+  font-variant-numeric: tabular-nums;
+}
+.topActions :global(.ant-btn) {
+  height: 30px !important;
+  padding: 0 12px !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: var(--text-2) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  border-radius: 6px !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.topActions :global(.ant-btn:hover) {
+  background: var(--bg-elev) !important;
+  color: var(--text) !important;
+  border-color: transparent !important;
+}
+.topActions :global(.ant-btn .anticon) {
+  font-size: 13px;
+}
+
+/* ---- Page Header ---- */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--gap-5);
+}
+.headerLeft {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-1);
+  min-width: 0;
+}
+.eyebrow {
+  font-size: var(--fs-11);
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.title {
+  font-size: var(--fs-28);
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  color: var(--text);
+  line-height: 1.1;
+  margin: 0;
+}
+.subtitle {
+  font-size: var(--fs-13);
+  color: var(--text-2);
+  margin-top: var(--gap-1);
+}
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-2);
+  flex-shrink: 0;
+}
+
+/* ---- KPI strip ---- */
+.kpiStrip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--gap-3);
+}
+.kpi {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color .18s ease, transform .18s ease;
+  min-height: 138px;
+}
+.kpi:hover {
+  border-color: var(--text-3);
+}
+.kpiLabel {
+  font-size: var(--fs-11);
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-3);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.kpiCoin {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+  color: var(--text);
+  line-height: 1.15;
+  margin-top: 4px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.kpiCoinName {
+  font-family: -apple-system, "SF Pro Display", "Inter", sans-serif;
+}
+.kpiValue {
+  font-size: var(--fs-20);
+  font-weight: 700;
+  font-family: var(--num-font);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  margin-top: 2px;
+}
+.kpiValueUp { color: var(--gain); }
+.kpiValueDown { color: var(--loss); }
+.kpiValueNeutral { color: var(--text); }
+.kpiMeta {
+  margin-top: auto;
+  padding-top: 8px;
+  font-size: var(--fs-12);
+  font-family: var(--num-font);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-3);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.kpiSide {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.kpiSideArrow {
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+}
+.kpiSideUp .kpiSideArrow { color: var(--gain); }
+.kpiSideDown .kpiSideArrow { color: var(--loss); }
+.kpiEmpty {
+  font-size: var(--fs-12);
+  color: var(--text-3);
+  font-style: italic;
+}
+
+/* ---- Filter Bar ---- */
+.filterBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-3) var(--gap-4);
+  align-items: center;
+  padding: var(--gap-3) var(--gap-4);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
+}
+.filterGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+}
+.filterLabel {
+  font-size: var(--fs-12);
+  font-weight: 500;
+  color: var(--text-2);
+  white-space: nowrap;
+  letter-spacing: 0.1px;
+}
+.filterDivider {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+}
+
+/* ---- Table wrapper ---- */
+.tableWrap {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.filterBar + .tableWrap {
+  margin-top: calc(var(--gap-5) * -1);
+  border-radius: 0 0 10px 10px;
+}
+.tableHeader {
+  padding: 14px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+.tableTitle {
+  font-size: var(--fs-14);
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.1px;
+}
+.tableMeta {
+  font-size: var(--fs-12);
+  color: var(--text-3);
+  font-family: var(--num-font);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Inside-scope overrides for antd controls in the filter bar ---- */
+.page .filterBar :global(.ant-select),
+.page .filterBar :global(.ant-picker),
+.page .filterBar :global(.ant-input-number),
+.page .filterBar :global(.ant-input) {
+  min-width: 0;
+}
+.page .filterBar :global(.ant-select-selector),
+.page .filterBar :global(.ant-picker),
+.page .filterBar :global(.ant-input-number),
+.page .filterBar :global(.ant-input) {
+  height: 32px !important;
+  background: var(--bg-page) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 6px !important;
+  font-size: 13px !important;
+  transition: border-color .12s ease;
+}
+.page .filterBar :global(.ant-select-selector:hover),
+.page .filterBar :global(.ant-picker:hover),
+.page .filterBar :global(.ant-input-number:hover),
+.page .filterBar :global(.ant-input:hover) {
+  border-color: var(--text-3) !important;
+}
+.page .filterBar :global(.ant-btn-primary) {
+  height: 32px !important;
+  padding: 0 18px !important;
+  background: var(--text) !important;
+  border: 1px solid var(--text) !important;
+  color: var(--bg-page) !important;
+  font-weight: 600 !important;
+}
+.page .filterBar :global(.ant-btn-primary:hover) {
+  opacity: 0.88;
+}
+
+/* Table inside tableWrap — zebra + refined rows */
+.page .tableWrap :global(.ant-table) {
+  background: transparent !important;
+  font-size: 13px !important;
+}
+.page .tableWrap :global(.ant-table-column-sorters) {
+  justify-content: flex-start !important;
+  gap: 4px;
+}
+.page .tableWrap :global(.ant-table-column-title) {
+  flex: 0 0 auto !important;
+}
+.page .tableWrap :global(.ant-table-thead > tr > th) {
+  background: var(--bg-page) !important;
+  color: var(--text-3) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  padding: 12px 14px !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+.page .tableWrap :global(.ant-table-tbody > tr > td) {
+  padding: 14px !important;
+  border-bottom: 1px solid var(--border-soft) !important;
+  font-weight: 500 !important;
+  font-variant-numeric: tabular-nums;
+}
+.page .tableWrap :global(.ant-table-tbody > tr:nth-child(even) > td) {
+  background: rgba(127,127,127,0.025);
+}
+.page .tableWrap :global(.ant-table-tbody > tr:hover > td) {
+  background: var(--bg-row-hover) !important;
+}
+.page .tableWrap :global(.ant-table-pagination) {
+  padding: 12px 18px !important;
+  margin: 0 !important;
+  border-top: 1px solid var(--border-soft);
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 1200px) {
+  .kpiStrip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

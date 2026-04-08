@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { Card, Table, Tag, Space, Select, Row, Col, Button } from 'antd';
-import { ReloadOutlined } from '@ant-design/icons';
+import { Table, Tag, Select } from 'antd';
+import s from '../../styles/page.module.css';
 
 const exchangeTagColor: Record<string, string> = {
   BN: 'gold',
@@ -167,45 +167,43 @@ export default function NewListing() {
   ];
 
   return (
-    <Card title={<span style={{ fontSize: 16, fontWeight: 600 }}>新上线币种</span>} extra={
-      <Space align="center">
-        {lastUpdate && <span style={{ color: '#999', fontSize: 12 }}>更新时间：{lastUpdate}</span>}
-        <Button size="small" icon={<ReloadOutlined />} onClick={loadData} loading={loading}>刷新</Button>
-      </Space>
-    }>
-      <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
-        <Col>
-          <Space size={4}>
-            <span>交易所：</span>
-            <Select
-              value={exchange}
-              onChange={setExchange}
-              options={exchangeOptions}
-              style={{ width: 100 }}
-            />
-          </Space>
-        </Col>
-        <Col>
-          <Space size={4}>
-            <span>结算周期：</span>
-            <Select
-              value={period}
-              onChange={setPeriod}
-              options={periodOptions}
-              style={{ width: 80 }}
-            />
-          </Space>
-        </Col>
-      </Row>
-      <Table<NewListingItem>
-        columns={columns}
-        dataSource={filteredData}
-        loading={loading}
-        rowKey={(record) => `${record.coin_name}_${record.exchange}`}
-        pagination={{ pageSize: 100, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
-        size="small"
-        scroll={{ x: 960 }}
-      />
-    </Card>
+    <div className={s.page}>
+      {lastUpdate && (
+        <div className={s.topActions}>
+          <span className={s.updateLabel}>更新 {lastUpdate}</span>
+        </div>
+      )}
+      <div className={s.filterBar}>
+        <div className={s.filterGroup}>
+          <span className={s.filterLabel}>交易所</span>
+          <Select
+            value={exchange}
+            onChange={setExchange}
+            options={exchangeOptions}
+            style={{ width: 100 }}
+          />
+        </div>
+        <div className={s.filterGroup}>
+          <span className={s.filterLabel}>结算周期</span>
+          <Select
+            value={period}
+            onChange={setPeriod}
+            options={periodOptions}
+            style={{ width: 80 }}
+          />
+        </div>
+      </div>
+      <div className={s.tableWrap}>
+        <Table<NewListingItem>
+          columns={columns}
+          dataSource={filteredData}
+          loading={loading}
+          rowKey={(record) => `${record.coin_name}_${record.exchange}`}
+          pagination={{ pageSize: 100, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
+          size="small"
+          scroll={{ x: 960 }}
+        />
+      </div>
+    </div>
   );
 }

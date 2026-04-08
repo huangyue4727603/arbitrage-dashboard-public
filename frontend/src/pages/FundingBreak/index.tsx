@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
-import { Card, Table, Tag, Space, Select, Row, Col, Progress, Button } from 'antd';
-import { ReloadOutlined } from '@ant-design/icons';
+import { Table, Tag, Select, Progress } from 'antd';
+import s from '../../styles/page.module.css';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useWsStore } from '../../stores/wsStore';
@@ -256,45 +256,37 @@ export default function FundingBreak() {
   ];
 
   return (
-    <Card
-      title={<span style={{ fontSize: 16, fontWeight: 600 }}>资费突破</span>}
-      extra={
-        <Space align="center">
-          {updateTime && <span style={{ color: '#999', fontSize: 12 }}>更新时间：{updateTime}</span>}
-          <span style={{ color: '#999', fontSize: 12 }}>共 {data.length} 个币种，{breakingCount} 个突破</span>
-          <Button size="small" icon={<ReloadOutlined />} onClick={async () => { const res = await fundingBreakApi.getBreakingCoins(); setData(transformData(res.data)); markUpdateTime(); }} loading={loading}>刷新</Button>
-        </Space>
-      }
-    >
-      <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
-        <Col>
-          <Space size={4}>
-            <span>交易所：</span>
-            <Select value={exchange} onChange={setExchange} options={exchangeOptions} style={{ width: 100 }} />
-          </Space>
-        </Col>
-        <Col>
-          <Space size={4}>
-            <span>结算周期：</span>
-            <Select value={interval} onChange={setInterval_} options={intervalOptions} style={{ width: 80 }} />
-          </Space>
-        </Col>
-        <Col>
-          <Space size={4}>
-            <span>状态：</span>
-            <Select value={breakingFilter} onChange={setBreakingFilter} options={breakingOptions} style={{ width: 90 }} />
-          </Space>
-        </Col>
-      </Row>
-      <Table<DisplayItem>
-        columns={columns}
-        dataSource={filteredData}
-        loading={loading}
-        rowKey="key"
-        pagination={{ pageSize: 100, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
-        size="small"
-        scroll={{ x: 1060 }}
-      />
-    </Card>
+    <div className={s.page}>
+      {updateTime && (
+        <div className={s.topActions}>
+          <span className={s.updateLabel}>更新 {updateTime}</span>
+        </div>
+      )}
+      <div className={s.filterBar}>
+        <div className={s.filterGroup}>
+          <span className={s.filterLabel}>交易所</span>
+          <Select value={exchange} onChange={setExchange} options={exchangeOptions} style={{ width: 100 }} />
+        </div>
+        <div className={s.filterGroup}>
+          <span className={s.filterLabel}>结算周期</span>
+          <Select value={interval} onChange={setInterval_} options={intervalOptions} style={{ width: 80 }} />
+        </div>
+        <div className={s.filterGroup}>
+          <span className={s.filterLabel}>状态</span>
+          <Select value={breakingFilter} onChange={setBreakingFilter} options={breakingOptions} style={{ width: 90 }} />
+        </div>
+      </div>
+      <div className={s.tableWrap}>
+        <Table<DisplayItem>
+          columns={columns}
+          dataSource={filteredData}
+          loading={loading}
+          rowKey="key"
+          pagination={{ pageSize: 100, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
+          size="small"
+          scroll={{ x: 1060 }}
+        />
+      </div>
+    </div>
   );
 }

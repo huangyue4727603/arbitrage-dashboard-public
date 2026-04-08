@@ -1,20 +1,19 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Card, DatePicker, Button, Space, message, Select, InputNumber, Row, Col, Typography, Input } from 'antd';
-import { CalculatorOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { DatePicker, message, Select, InputNumber } from 'antd';
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
 import { fundingApi, type RankItem, type RealtimeData } from '../../api/funding';
 import RankTable from './RankTable';
-import Calculator, { type CalcInitialValues } from './Calculator';
+import { useCalculatorStore } from '../../stores/calculatorStore';
+import s from './FundingRank.module.css';
 
 const { RangePicker } = DatePicker;
-const { Text } = Typography;
 
 const exchangeOptions = [
   { label: '全部', value: '' },
-  { label: 'BN', value: 'BN' },
+  { label: 'Binance (BN)', value: 'BN' },
   { label: 'OKX', value: 'OKX' },
-  { label: 'BY', value: 'BY' },
+  { label: 'Bybit (BY)', value: 'BY' },
 ];
 
 const periodOptions = [
@@ -63,9 +62,7 @@ export default function FundingRank() {
     return () => clearInterval(timer);
   }, []);
 
-  // Calculator modal state
-  const [calcOpen, setCalcOpen] = useState(false);
-  const [calcInitial, setCalcInitial] = useState<CalcInitialValues | undefined>();
+  const openCalculator = useCalculatorStore((s) => s.openCalculator);
 
   const realtimeRef = useRef<RealtimeData>({});
 
@@ -117,6 +114,28 @@ export default function FundingRank() {
     return () => clearInterval(timer);
   }, []);
 
+  // Independent rankings for KPI cards 3 & 4 (not tied to user filter)
+  const [lastHourData, setLastHourData] = useState<RankItem[]>([]);
+  const [last24hData, setLast24hData] = useState<RankItem[]>([]);
+  useEffect(() => {
+    const fetchKpiRanges = async () => {
+      const now = Date.now();
+      try {
+        const [h8, h24] = await Promise.all([
+          fundingApi.getRankings(now - 8 * 60 * 60 * 1000, now),
+          fundingApi.getRankings(now - 24 * 60 * 60 * 1000, now),
+        ]);
+        setLastHourData(h8.data);
+        setLast24hData(h24.data);
+      } catch {
+        // silent
+      }
+    };
+    fetchKpiRanges();
+    const timer = setInterval(fetchKpiRanges, 60000);
+    return () => clearInterval(timer);
+  }, []);
+
   // Merge realtime data into rankings and apply filters
   const filteredData = rankings
     .map((item) => {
@@ -147,13 +166,12 @@ export default function FundingRank() {
     });
 
   const handleDiffClick = (record: RankItem) => {
-    setCalcInitial({
+    openCalculator({
       coin: record.coin,
       longExchange: record.long_exchange,
       shortExchange: record.short_exchange,
       timeRange: [dateRange[0], dateRange[1]],
     });
-    setCalcOpen(true);
   };
 
   const handleDateChange = (dates: [Dayjs | null, Dayjs | null] | null) => {
@@ -162,184 +180,250 @@ export default function FundingRank() {
     }
   };
 
-  return (
-    <Card
-      title={<span style={{ fontSize: 16, fontWeight: 600 }}>资费排行</span>}
-      extra={
-        <Space align="center">
-          {lastUpdate && (
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              更新时间: {lastUpdate}
-            </Text>
-          )}
-          <Button size="small" icon={<ReloadOutlined />} onClick={fetchRankings} loading={loading}>
-            刷新
-          </Button>
-          <Button
-            size="small"
-            type="primary"
-            icon={<CalculatorOutlined />}
-            onClick={() => { setCalcInitial(undefined); setCalcOpen(true); }}
-          >
-            资费计算器
-          </Button>
-        </Space>
+  // KPI metrics
+  const kpi = useMemo(() => {
+    // Card 1: 最负基差 (realtime, across all rankings merged with latest basis)
+    let mostNegBasis: { coin: string; value: number } | null = null;
+    for (const item of rankings) {
+      const key = `${item.coin}_${item.long_exchange}_${item.short_exchange}`;
+      const rt = realtimeData[key];
+      const basis = rt?.basis ?? item.current_basis;
+      if (basis === undefined || basis === null) continue;
+      if (!mostNegBasis || basis < mostNegBasis.value) {
+        mostNegBasis = { coin: item.coin, value: basis };
       }
-    >
-      {/* Filter row 1: Time + Exchanges */}
-      <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
-        <Col>
-          <Space size={4}>
-            <span>时间：</span>
-            <RangePicker
-              showTime={{ format: 'HH:00' }}
-              format="YYYY-MM-DD HH:00"
-              value={dateRange}
-              onChange={handleDateChange}
-              presets={[
-                { label: '最近1H', value: [dayjs().subtract(1, 'hour'), dayjs()] },
-                { label: '最近4H', value: [dayjs().subtract(4, 'hour'), dayjs()] },
-                { label: '最近8H', value: [dayjs().subtract(8, 'hour'), dayjs()] },
-                { label: '最近12H', value: [dayjs().subtract(12, 'hour'), dayjs()] },
-                { label: '最近24H', value: [dayjs().subtract(1, 'day'), dayjs()] },
-                { label: '最近3天', value: [dayjs().subtract(3, 'day'), dayjs()] },
-                { label: '最近7天', value: [dayjs().subtract(7, 'day'), dayjs()] },
-                { label: '最近30天', value: [dayjs().subtract(30, 'day'), dayjs()] },
-              ]}
-            />
-          </Space>
-        </Col>
-        <Col>
-          <Space size={4}>
-            <span>做多交易所：</span>
-            <Select
-              value={longExchange}
-              onChange={setLongExchange}
-              options={exchangeOptions}
-              style={{ width: 90 }}
-            />
-          </Space>
-        </Col>
-        <Col>
-          <Space size={4}>
-            <span>做空交易所：</span>
-            <Select
-              value={shortExchange}
-              onChange={setShortExchange}
-              options={exchangeOptions}
-              style={{ width: 90 }}
-            />
-          </Space>
-        </Col>
-        <Col>
-          <Button type="primary" icon={<SearchOutlined />} onClick={fetchRankings} loading={loading}>
-            查询
-          </Button>
-        </Col>
-      </Row>
+    }
 
-      {/* Filter row 2: Period + Spread + Basis + Coin */}
-      <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
-        <Col>
-          <Space size={4}>
-            <span>币种：</span>
-            <Select
-              showSearch
-              allowClear
-              value={coinFilter || undefined}
-              onChange={(v) => setCoinFilter(v || '')}
-              options={coinOptions}
-              placeholder="搜索币种"
-              style={{ width: 130 }}
-              filterOption={(input, option) =>
-                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-              }
-            />
-          </Space>
-        </Col>
-        <Col>
-          <Space size={4}>
-            <span>做多结算周期：</span>
-            <Select
-              mode="multiple"
-              value={longPeriods}
-              onChange={setLongPeriods}
-              options={periodOptions}
-              placeholder="全部"
-              allowClear
-              style={{ minWidth: 100 }}
-            />
-          </Space>
-        </Col>
-        <Col>
-          <Space size={4}>
-            <span>做空结算周期：</span>
-            <Select
-              mode="multiple"
-              value={shortPeriods}
-              onChange={setShortPeriods}
-              options={periodOptions}
-              placeholder="全部"
-              allowClear
-              style={{ minWidth: 100 }}
-            />
-          </Space>
-        </Col>
-        <Col>
-          <Space size={4}>
-            <span>开差：</span>
-            <InputNumber
-              value={minSpread}
-              onChange={(v) => setMinSpread(v)}
-              placeholder="最小"
-              style={{ width: 80 }}
-              size="small"
-            />
-            <span>~</span>
-            <InputNumber
-              value={maxSpread}
-              onChange={(v) => setMaxSpread(v)}
-              placeholder="最大"
-              style={{ width: 80 }}
-              size="small"
-            />
-            <span>%</span>
-          </Space>
-        </Col>
-        <Col>
-          <Space size={4}>
-            <span>基差：</span>
-            <InputNumber
-              value={minBasis}
-              onChange={(v) => setMinBasis(v)}
-              placeholder="最小"
-              style={{ width: 80 }}
-              size="small"
-            />
-            <span>~</span>
-            <InputNumber
-              value={maxBasis}
-              onChange={(v) => setMaxBasis(v)}
-              placeholder="最大"
-              style={{ width: 80 }}
-              size="small"
-            />
-            <span>%</span>
-          </Space>
-        </Col>
-      </Row>
+    // Card 2: 1d 最大涨幅
+    let maxChange1d: { coin: string; value: number } | null = null;
+    for (const coin of Object.keys(priceChanges)) {
+      const v = priceChanges[coin]?.change_1d;
+      if (v === undefined || v === null) continue;
+      if (!maxChange1d || v > maxChange1d.value) {
+        maxChange1d = { coin, value: v };
+      }
+    }
 
-      <RankTable
-        data={filteredData}
-        loading={loading}
-        onDiffClick={handleDiffClick}
-      />
+    // Card 3: 最近 1h 资费差最多，做空 = BN
+    const pickBestShortBN = (data: RankItem[]) => {
+      let best: { coin: string; value: number; longEx: string } | null = null;
+      for (const item of data) {
+        if (item.short_exchange !== 'BN') continue;
+        const v = item.total_diff ?? 0;
+        if (!best || v > best.value) {
+          best = { coin: item.coin, value: v, longEx: item.long_exchange };
+        }
+      }
+      return best;
+    };
+    const lastSettleBest = pickBestShortBN(lastHourData);
+    const last24hBest = pickBestShortBN(last24hData);
 
-      <Calculator
-        open={calcOpen}
-        onClose={() => { setCalcOpen(false); setCalcInitial(undefined); }}
-        initialValues={calcInitial}
-      />
-    </Card>
+    return { mostNegBasis, maxChange1d, lastSettleBest, last24hBest };
+  }, [rankings, realtimeData, priceChanges, lastHourData, last24hData]);
+
+  return (
+    <div className={s.page}>
+      {/* Floating top actions (aligns with Tabs bar) */}
+      {lastUpdate && (
+        <div className={s.topActions}>
+          <span className={s.updateLabel}>更新 {lastUpdate}</span>
+        </div>
+      )}
+
+      {/* ===== KPI Strip ===== */}
+      <div className={s.kpiStrip}>
+        {/* Card 1: 最负基差 */}
+        <div className={s.kpi}>
+          <div className={s.kpiLabel}>最负基差</div>
+          {kpi.mostNegBasis ? (
+            <>
+              <div className={s.kpiCoin}>
+                <span className={s.kpiCoinName}>{kpi.mostNegBasis.coin}</span>
+              </div>
+              <div className={`${s.kpiValue} ${s.kpiValueDown}`}>
+                {kpi.mostNegBasis.value.toFixed(4)}%
+              </div>
+              <div className={s.kpiMeta}>实时基差</div>
+            </>
+          ) : (
+            <div className={s.kpiEmpty}>暂无数据</div>
+          )}
+        </div>
+
+        {/* Card 2: 1D 最大涨幅 */}
+        <div className={s.kpi}>
+          <div className={s.kpiLabel}>1D 最大涨幅</div>
+          {kpi.maxChange1d ? (
+            <>
+              <div className={s.kpiCoin}>
+                <span className={s.kpiCoinName}>{kpi.maxChange1d.coin}</span>
+              </div>
+              <div className={`${s.kpiValue} ${s.kpiValueUp}`}>
+                +{kpi.maxChange1d.value.toFixed(2)}%
+              </div>
+              <div className={s.kpiMeta}>24 小时涨幅</div>
+            </>
+          ) : (
+            <div className={s.kpiEmpty}>暂无数据</div>
+          )}
+        </div>
+
+        {/* Card 3: 上周期最大资费差 (空 BN) */}
+        <div className={s.kpi}>
+          <div className={s.kpiLabel}>上周期最大资费差</div>
+          {kpi.lastSettleBest ? (
+            <>
+              <div className={s.kpiCoin}>
+                <span className={s.kpiCoinName}>{kpi.lastSettleBest.coin}</span>
+              </div>
+              <div className={`${s.kpiValue} ${kpi.lastSettleBest.value >= 0 ? s.kpiValueUp : s.kpiValueDown}`}>
+                {kpi.lastSettleBest.value >= 0 ? '+' : ''}{kpi.lastSettleBest.value.toFixed(4)}%
+              </div>
+              <div className={s.kpiMeta}>
+                <span className={`${s.kpiSide} ${s.kpiSideUp}`}>
+                  <span className={s.kpiSideArrow}>▲</span>多 {kpi.lastSettleBest.longEx}
+                </span>
+                <span className={`${s.kpiSide} ${s.kpiSideDown}`}>
+                  <span className={s.kpiSideArrow}>▼</span>空 BN
+                </span>
+              </div>
+            </>
+          ) : (
+            <div className={s.kpiEmpty}>暂无数据</div>
+          )}
+        </div>
+
+        {/* Card 4: 24H 最大资费差 (空 BN) */}
+        <div className={s.kpi}>
+          <div className={s.kpiLabel}>24H 最大资费差</div>
+          {kpi.last24hBest ? (
+            <>
+              <div className={s.kpiCoin}>
+                <span className={s.kpiCoinName}>{kpi.last24hBest.coin}</span>
+              </div>
+              <div className={`${s.kpiValue} ${kpi.last24hBest.value >= 0 ? s.kpiValueUp : s.kpiValueDown}`}>
+                {kpi.last24hBest.value >= 0 ? '+' : ''}{kpi.last24hBest.value.toFixed(4)}%
+              </div>
+              <div className={s.kpiMeta}>
+                <span className={`${s.kpiSide} ${s.kpiSideUp}`}>
+                  <span className={s.kpiSideArrow}>▲</span>多 {kpi.last24hBest.longEx}
+                </span>
+                <span className={`${s.kpiSide} ${s.kpiSideDown}`}>
+                  <span className={s.kpiSideArrow}>▼</span>空 BN
+                </span>
+              </div>
+            </>
+          ) : (
+            <div className={s.kpiEmpty}>暂无数据</div>
+          )}
+        </div>
+      </div>
+
+      {/* ===== Filter Bar ===== */}
+      <div className={s.filterBar}>
+        <div className={s.filterGroup}>
+          <span className={s.filterLabel}>时间</span>
+          <RangePicker
+            showTime={{ format: 'HH:00' }}
+            format="YYYY-MM-DD HH:00"
+            value={dateRange}
+            onChange={handleDateChange}
+            presets={[
+              { label: '1H', value: [dayjs().subtract(1, 'hour'), dayjs()] },
+              { label: '4H', value: [dayjs().subtract(4, 'hour'), dayjs()] },
+              { label: '8H', value: [dayjs().subtract(8, 'hour'), dayjs()] },
+              { label: '24H', value: [dayjs().subtract(1, 'day'), dayjs()] },
+              { label: '3D', value: [dayjs().subtract(3, 'day'), dayjs()] },
+              { label: '7D', value: [dayjs().subtract(7, 'day'), dayjs()] },
+              { label: '30D', value: [dayjs().subtract(30, 'day'), dayjs()] },
+            ]}
+          />
+        </div>
+
+        <div className={s.filterDivider} />
+
+        <div className={s.filterGroup}>
+          <span className={s.filterLabel}>币种</span>
+          <Select
+            showSearch
+            allowClear
+            value={coinFilter || undefined}
+            onChange={(v) => setCoinFilter(v || '')}
+            options={coinOptions}
+            placeholder="搜索"
+            style={{ width: 120 }}
+            filterOption={(input, option) =>
+              (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+            }
+          />
+        </div>
+
+        <div className={s.filterGroup}>
+          <span className={s.filterLabel}>做多</span>
+          <Select value={longExchange} onChange={setLongExchange} options={exchangeOptions} style={{ width: 140 }} />
+        </div>
+
+        <div className={s.filterGroup}>
+          <span className={s.filterLabel}>做空</span>
+          <Select value={shortExchange} onChange={setShortExchange} options={exchangeOptions} style={{ width: 140 }} />
+        </div>
+
+        <div className={s.filterDivider} />
+
+        <div className={s.filterGroup}>
+          <span className={s.filterLabel}>多周期</span>
+          <Select
+            mode="multiple"
+            value={longPeriods}
+            onChange={setLongPeriods}
+            options={periodOptions}
+            placeholder="全部"
+            allowClear
+            style={{ minWidth: 110, maxWidth: 180 }}
+          />
+        </div>
+
+        <div className={s.filterGroup}>
+          <span className={s.filterLabel}>空周期</span>
+          <Select
+            mode="multiple"
+            value={shortPeriods}
+            onChange={setShortPeriods}
+            options={periodOptions}
+            placeholder="全部"
+            allowClear
+            style={{ minWidth: 110, maxWidth: 180 }}
+          />
+        </div>
+
+        <div className={s.filterDivider} />
+
+        <div className={s.filterGroup}>
+          <span className={s.filterLabel}>开差</span>
+          <InputNumber value={minSpread} onChange={(v) => setMinSpread(v)} placeholder="最小" style={{ width: 72 }} />
+          <span style={{ color: 'var(--text-3)' }}>–</span>
+          <InputNumber value={maxSpread} onChange={(v) => setMaxSpread(v)} placeholder="最大" style={{ width: 72 }} />
+        </div>
+
+        <div className={s.filterGroup}>
+          <span className={s.filterLabel}>基差</span>
+          <InputNumber value={minBasis} onChange={(v) => setMinBasis(v)} placeholder="最小" style={{ width: 72 }} />
+          <span style={{ color: 'var(--text-3)' }}>–</span>
+          <InputNumber value={maxBasis} onChange={(v) => setMaxBasis(v)} placeholder="最大" style={{ width: 72 }} />
+        </div>
+
+      </div>
+
+      {/* ===== Table ===== */}
+      <div className={s.tableWrap}>
+        <RankTable
+          data={filteredData}
+          loading={loading}
+          onDiffClick={handleDiffClick}
+        />
+      </div>
+
+    </div>
   );
 }

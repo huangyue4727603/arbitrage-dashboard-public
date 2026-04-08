@@ -31,15 +31,15 @@ html, body, #root {
   --brand:      #F0B90B;
 }
 :root[data-theme="light"] {
-  --bg-page:    #FFFFFF;
+  --bg-page:    #F2F4F7;
   --bg-card:    #FFFFFF;
-  --bg-elev:    #F5F5F5;
-  --bg-row-hover: #F5F5F5;
-  --border:     #D5D9DD;
-  --border-soft:#EAECEF;
+  --bg-elev:    #EDEFF3;
+  --bg-row-hover: #EDEFF3;
+  --border:     #C8CDD4;
+  --border-soft:#DDE1E6;
   --text:       #000000;
-  --text-2:     #474D57;
-  --text-3:     #929AA5;
+  --text-2:     #323842;
+  --text-3:     #7A828E;
   --gain:       #2EBD85;
   --loss:       #F6465D;
   --brand:      #C99400;
@@ -107,6 +107,13 @@ body { background: var(--bg-page); color: var(--text); }
 .ant-table-container::after { display: none !important; }
 .ant-table-thead { box-shadow: none !important; }
 .ant-table-tbody > tr:first-child > td { border-top: none !important; }
+/* Kill antd's hidden measure row that creates a phantom gap under the header */
+.ant-table-measure-row,
+.ant-table-tbody > tr.ant-table-measure-row {
+  display: none !important;
+  height: 0 !important;
+}
+.ant-table-measure-row td { padding: 0 !important; height: 0 !important; border: none !important; }
 .ant-table-summary { border-top: 1px solid var(--border) !important; }
 .ant-table-tbody > tr > td {
   padding: 11px 12px !important;
@@ -144,7 +151,7 @@ body { background: var(--bg-page); color: var(--text); }
 
 /* === Tabs: pure text, minimal === */
 .ant-tabs-nav { margin: 0 0 16px !important; padding: 0 !important; }
-.ant-tabs-nav::before { border-bottom: 1px solid var(--border) !important; }
+.ant-tabs-nav::before { border-bottom: none !important; }
 .ant-tabs-tab {
   padding: 10px 16px !important;
   font-size: 14px !important;

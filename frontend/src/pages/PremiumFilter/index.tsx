@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Card, Table, Button, Space, Select, InputNumber, message, Row, Col } from 'antd';
-import { SearchOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Table, Select, InputNumber, message } from 'antd';
+import s from '../../styles/page.module.css';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { fetchPremiumFilter, fetchRealtimeBasis, type PremiumFilterItem } from '../../api/premiumFilter';
@@ -176,65 +176,50 @@ export default function PremiumFilter() {
   ];
 
   return (
-    <Card
-      title={<span style={{ fontSize: 16, fontWeight: 600 }}>大额基差</span>}
-      extra={
-        <Space align="center">
-          {lastUpdate && <span style={{ color: '#999', fontSize: 12 }}>更新时间：{lastUpdate}</span>}
-          <Button size="small" icon={<ReloadOutlined />} onClick={handleQuery} loading={loading}>刷新</Button>
-        </Space>
-      }
-    >
-      <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
-        <Col>
-          <Space size={4}>
-            <span>时间范围：</span>
-            <Select
-              value={hours}
-              onChange={setHours}
-              options={timeOptions}
-              style={{ width: 130 }}
-            />
-          </Space>
-        </Col>
-        <Col>
-          <Space size={4}>
-            <span>最小基差(%)：</span>
-            <InputNumber
-              value={threshold}
-              onChange={(v) => v !== null && setThreshold(v)}
-              step={0.5}
-              style={{ width: 100 }}
-            />
-          </Space>
-        </Col>
-        <Col>
-          <Button
-            type="primary"
-            icon={<SearchOutlined />}
-            onClick={handleQuery}
-            loading={loading}
-          >
-            查询
-          </Button>
-        </Col>
-      </Row>
+    <div className={s.page}>
+      {lastUpdate && (
+        <div className={s.topActions}>
+          <span className={s.updateLabel}>更新 {lastUpdate}</span>
+        </div>
+      )}
+      <div className={s.filterBar}>
+        <div className={s.filterGroup}>
+          <span className={s.filterLabel}>时间范围</span>
+          <Select
+            value={hours}
+            onChange={setHours}
+            options={timeOptions}
+            style={{ width: 130 }}
+          />
+        </div>
+        <div className={s.filterGroup}>
+          <span className={s.filterLabel}>最小基差(%)</span>
+          <InputNumber
+            value={threshold}
+            onChange={(v) => v !== null && setThreshold(v)}
+            step={0.5}
+            style={{ width: 100 }}
+          />
+        </div>
+      </div>
 
-      <Table<DisplayItem>
-        columns={columns}
-        dataSource={mergedData}
-        rowKey="raw"
-        loading={loading}
-        size="small"
-        pagination={{ pageSize: 50, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
-        locale={{ emptyText: '点击查询获取数据' }}
-      />
+      <div className={s.tableWrap}>
+        <Table<DisplayItem>
+          columns={columns}
+          dataSource={mergedData}
+          rowKey="raw"
+          loading={loading}
+          size="small"
+          pagination={{ pageSize: 50, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
+          locale={{ emptyText: '点击查询获取数据' }}
+        />
+      </div>
 
       <Calculator
         open={calcOpen}
         onClose={() => { setCalcOpen(false); setCalcInitial(undefined); }}
         initialValues={calcInitial}
       />
-    </Card>
+    </div>
   );
 }

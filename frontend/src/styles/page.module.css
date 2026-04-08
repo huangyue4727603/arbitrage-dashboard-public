@@ -1,0 +1,184 @@
+/* === Shared page shell — used across all tabs === */
+
+.page {
+  --gap-1: 4px;
+  --gap-2: 8px;
+  --gap-3: 12px;
+  --gap-4: 16px;
+  --gap-5: 24px;
+  --gap-6: 32px;
+
+  --fs-11: 11px;
+  --fs-12: 12px;
+  --fs-13: 13px;
+  --fs-14: 14px;
+  --fs-16: 16px;
+  --fs-20: 20px;
+  --fs-28: 28px;
+
+  --num-font: "SF Mono", "JetBrains Mono", "Roboto Mono", Menlo, Consolas, monospace;
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-5);
+  padding-bottom: var(--gap-6);
+}
+
+/* Floating top actions — aligns with Tabs bar */
+.topActions {
+  position: absolute;
+  top: -52px;
+  right: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 44px;
+  pointer-events: none;
+}
+.topActions > * { pointer-events: auto; }
+.updateLabel {
+  font-size: 12px;
+  color: var(--text-3);
+  font-family: var(--num-font);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Filter Bar ---- */
+.filterBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-3) var(--gap-4);
+  align-items: center;
+  padding: var(--gap-3) var(--gap-4);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
+}
+.filterGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+}
+.filterLabel {
+  font-size: var(--fs-12);
+  font-weight: 500;
+  color: var(--text-2);
+  white-space: nowrap;
+  letter-spacing: 0.1px;
+}
+.filterDivider {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+}
+.filterSpacer { flex: 1; }
+
+/* Inputs inside filter bar — unified pill style */
+.page .filterBar :global(.ant-select),
+.page .filterBar :global(.ant-picker),
+.page .filterBar :global(.ant-input-number),
+.page .filterBar :global(.ant-input) {
+  min-width: 0;
+}
+.page .filterBar :global(.ant-select-selector),
+.page .filterBar :global(.ant-picker),
+.page .filterBar :global(.ant-input-number),
+.page .filterBar :global(.ant-input) {
+  height: 32px !important;
+  background: var(--bg-page) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 6px !important;
+  font-size: 13px !important;
+  transition: border-color .12s ease;
+}
+.page .filterBar :global(.ant-select-selector:hover),
+.page .filterBar :global(.ant-picker:hover),
+.page .filterBar :global(.ant-input-number:hover),
+.page .filterBar :global(.ant-input:hover) {
+  border-color: var(--text-3) !important;
+}
+.page .filterBar :global(.ant-btn-primary) {
+  height: 32px !important;
+  padding: 0 18px !important;
+  background: var(--text) !important;
+  border: 1px solid var(--text) !important;
+  color: var(--bg-page) !important;
+  font-weight: 600 !important;
+}
+.page .filterBar :global(.ant-btn-primary:hover) {
+  opacity: 0.88;
+}
+
+/* ---- Table wrapper ---- */
+.tableWrap {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.filterBar + .tableWrap {
+  margin-top: calc(var(--gap-5) * -1);
+  border-radius: 0 0 10px 10px;
+}
+.tableHeader {
+  padding: 14px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+.tableTitle {
+  font-size: var(--fs-14);
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.1px;
+}
+.tableMeta {
+  font-size: var(--fs-12);
+  color: var(--text-3);
+  font-family: var(--num-font);
+  font-variant-numeric: tabular-nums;
+}
+
+.page .tableWrap :global(.ant-table) {
+  background: transparent !important;
+  font-size: 13px !important;
+}
+.page .tableWrap :global(.ant-table-column-sorters) {
+  justify-content: flex-start !important;
+  gap: 4px;
+}
+.page .tableWrap :global(.ant-table-column-title) {
+  flex: 0 0 auto !important;
+}
+.page .tableWrap :global(.ant-table-thead > tr > th) {
+  background: var(--bg-page) !important;
+  color: var(--text-3) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  padding: 12px 14px !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+.page .tableWrap :global(.ant-table-tbody > tr > td) {
+  padding: 14px !important;
+  border-bottom: 1px solid var(--border-soft) !important;
+  font-weight: 500 !important;
+  font-variant-numeric: tabular-nums;
+}
+.page .tableWrap :global(.ant-table-tbody > tr:nth-child(even) > td) {
+  background: rgba(127,127,127,0.025);
+}
+.page .tableWrap :global(.ant-table-tbody > tr:hover > td) {
+  background: var(--bg-row-hover) !important;
+}
+.page .tableWrap :global(.ant-table-pagination) {
+  padding: 12px 18px !important;
+  margin: 0 !important;
+  border-top: 1px solid var(--border-soft);
+}

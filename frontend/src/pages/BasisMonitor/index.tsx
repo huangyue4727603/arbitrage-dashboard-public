@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import {
-  Card, Table, Tag, Typography, Button, Space, message,
+  Table, Tag, Typography, Button, Space, message,
   Timeline, InputNumber, Row, Col, Popover, Modal, Input,
 } from 'antd';
-import { ClearOutlined, ReloadOutlined, SettingOutlined } from '@ant-design/icons';
+import { ClearOutlined, SettingOutlined } from '@ant-design/icons';
+import s from '../../styles/page.module.css';
 import NProgress from 'nprogress';
 import type { ColumnsType } from 'antd/es/table';
 import { useWsStore } from '../../stores/wsStore';
@@ -243,54 +244,38 @@ export default function BasisMonitor() {
   );
 
   return (
-    <Card
-      title={
-        <Space align="center" size={12}>
-          <span style={{ fontSize: 16, fontWeight: 600 }}>基差监控</span>
-          {lastUpdate && <Text type="secondary" style={{ fontSize: 12 }}>更新时间：{lastUpdate}</Text>}
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            阈值: {config.basis_threshold}% | 倍数: {config.expand_multiplier}x
-          </Text>
-        </Space>
-      }
-      extra={
-        <Space>
-          <Popover
-            content={configContent}
-            title="预警配置"
-            trigger="click"
-            open={configOpen}
-            onOpenChange={setConfigOpen}
-          >
-            <Button size="small" icon={<SettingOutlined />}>配置</Button>
-          </Popover>
-          <Button size="small" icon={<ReloadOutlined />} onClick={async () => {
-            NProgress.start();
-            try {
-              const data = await basisMonitorApi.refresh();
-              setRecords(data.records);
-              setTimeline(data.timeline);
-              setLastUpdate(new Date().toLocaleString());
-            } catch { message.error('刷新失败'); }
-            finally { NProgress.done(); }
-          }}>刷新</Button>
-          <Button size="small" icon={<ClearOutlined />} onClick={handleClear} danger>清除</Button>
-        </Space>
-      }
-    >
+    <div className={s.page}>
+      <div className={s.topActions}>
+        {lastUpdate && <span className={s.updateLabel}>更新 {lastUpdate}</span>}
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          阈值: {config.basis_threshold}% | 倍数: {config.expand_multiplier}x
+        </Text>
+        <Popover
+          content={configContent}
+          title="预警配置"
+          trigger="click"
+          open={configOpen}
+          onOpenChange={setConfigOpen}
+        >
+          <Button size="small" icon={<SettingOutlined />}>配置</Button>
+        </Popover>
+        <Button size="small" icon={<ClearOutlined />} onClick={handleClear} danger>清除</Button>
+      </div>
       <Row gutter={24}>
         {/* Left: Alert Table */}
         <Col span={14}>
-          <Table<BasisRecord>
-            columns={columns}
-            dataSource={records}
-            rowKey="coin_name"
-            size="small"
-            loading={loading}
-            pagination={{ pageSize: 30, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
-            locale={{ emptyText: '暂无预警数据' }}
-            scroll={{ x: 660 }}
-          />
+          <div className={s.tableWrap}>
+            <Table<BasisRecord>
+              columns={columns}
+              dataSource={records}
+              rowKey="coin_name"
+              size="small"
+              loading={loading}
+              pagination={{ pageSize: 30, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
+              locale={{ emptyText: '暂无预警数据' }}
+              scroll={{ x: 660 }}
+            />
+          </div>
         </Col>
 
         {/* Right: Timeline */}
@@ -358,6 +343,6 @@ export default function BasisMonitor() {
           pagination={false}
         />
       </Modal>
-    </Card>
+    </div>
   );
 }

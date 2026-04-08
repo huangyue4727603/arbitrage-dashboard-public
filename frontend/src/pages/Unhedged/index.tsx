@@ -266,9 +266,6 @@ export default function Unhedged() {
       extra={
         <Space align="center">
           {lastUpdate && <span style={{ color: '#999', fontSize: 12 }}>更新时间：{lastUpdate}</span>}
-          <Button size="small" icon={<ReloadOutlined />} onClick={fetchData} loading={loading}>
-            刷新
-          </Button>
         </Space>
       }
     >

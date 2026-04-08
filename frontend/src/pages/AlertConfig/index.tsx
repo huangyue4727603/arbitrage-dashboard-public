@@ -1,4 +1,5 @@
 import { Card, Result, Button, Tabs } from 'antd';
+import s from '../../styles/page.module.css';
 import {
   LockOutlined,
   SettingOutlined,
@@ -88,8 +89,8 @@ export default function AlertConfig() {
   }
 
   return (
-    <Card>
+    <div className={s.page}>
       <Tabs defaultActiveKey="notification" items={tabItems} />
-    </Card>
+    </div>
   );
 }
