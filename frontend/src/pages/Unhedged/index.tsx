@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Card, Tabs, Table, Tag, message, Button, Empty, Space } from 'antd';
+import { Card, Tabs, Table, Tag, message, Empty, Space } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { ReloadOutlined } from '@ant-design/icons';
 import { useWsStore } from '../../stores/wsStore';
 import {
   unhedgedApi,

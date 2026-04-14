@@ -122,7 +122,11 @@ class BasisAlertScheduler:
         self._config_last_refresh = 0
 
     async def _refresh_config(self) -> None:
-        """Load user config from DB (refresh every 5s)."""
+        """Load user config from DB (refresh every 5s).
+
+        Merges all users' configs: uses the most lenient threshold
+        (closest to 0) so every user's alerts can fire.
+        """
         import time
         now = time.time()
         if now - self._config_last_refresh < 5:
@@ -136,7 +140,6 @@ class BasisAlertScheduler:
             from sqlalchemy import select
 
             async with async_session_factory() as db:
-                # Get first user's config (for now, single-user optimization)
                 result = await db.execute(
                     select(
                         BasisAlertConfig.basis_threshold,
@@ -145,23 +148,33 @@ class BasisAlertScheduler:
                         BasisAlertConfig.sound_enabled,
                         BasisAlertConfig.popup_enabled,
                         BasisAlertConfig.user_id,
-                    ).limit(1)
+                    )
                 )
-                row = result.first()
-                if row:
-                    self._threshold = row[0] / 100  # DB stores -1.0 (percent), API uses -0.01
-                    self._multiplier = row[1]
-                    if row[2]:
-                        self._blocked_coins = {c.strip().upper() for c in row[2].split(",") if c.strip()}
+                rows = result.all()
+                if rows:
+                    # Use the most lenient threshold (closest to 0)
+                    self._threshold = max(r[0] for r in rows) / 100
+                    # Use the smallest multiplier (most sensitive)
+                    self._multiplier = min(r[1] for r in rows)
+                    # Intersect blocked coins (only block if ALL users block it)
+                    blocked_sets = []
+                    for r in rows:
+                        if r[2]:
+                            blocked_sets.append({c.strip().upper() for c in r[2].split(",") if c.strip()})
+                        else:
+                            blocked_sets.append(set())
+                    if blocked_sets:
+                        self._blocked_coins = set.intersection(*blocked_sets) if all(blocked_sets) else set()
                     else:
                         self._blocked_coins = set()
-                    self._sound_enabled = row[3]
-                    self._popup_enabled = row[4]
+                    # Sound/popup: enable if any user enables
+                    self._sound_enabled = any(r[3] for r in rows)
+                    self._popup_enabled = any(r[4] for r in rows)
 
-                    # Get global settings
+                    # Get global settings from first user
                     user_result = await db.execute(
                         select(User.sound_enabled, User.popup_enabled)
-                        .where(User.id == row[5])
+                        .where(User.id == rows[0][5])
                     )
                     user_row = user_result.first()
                     if user_row:

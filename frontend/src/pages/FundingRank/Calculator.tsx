@@ -11,7 +11,7 @@ export interface CalcInitialValues {
   coin: string;
   longExchange: string;
   shortExchange: string;
-  timeRange: [Dayjs, Dayjs];
+  timeRange?: [Dayjs, Dayjs];
 }
 
 interface CalculatorProps {

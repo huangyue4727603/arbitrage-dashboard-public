@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import {
-  Table, Tag, Typography, Button, Space, message,
+  Table, Tag, Typography, Button, message,
   Timeline, InputNumber, Row, Col, Popover, Modal, Input,
 } from 'antd';
 import { ClearOutlined, SettingOutlined } from '@ant-design/icons';

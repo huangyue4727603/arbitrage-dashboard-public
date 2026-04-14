@@ -1,0 +1,353 @@
+//@version=5
+indicator("支撑阻力位", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500)
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  参数
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+leftBars    = input.int(5,    "左侧K线数",     minval=2, maxval=30, group="Swing检测")
+rightBars   = input.int(5,    "右侧K线数",     minval=2, maxval=30, group="Swing检测")
+mergePct    = input.float(1.0,"合并阈值 (%)",   minval=0.1, maxval=5.0, step=0.1, group="Swing检测")
+lookback    = input.int(300,  "回溯K线数",     minval=50, maxval=1000, group="Swing检测")
+
+maxResist   = input.int(5,    "最大阻力条数",   minval=1, maxval=15, group="显示")
+maxSupport  = input.int(5,    "最大支撑条数",   minval=1, maxval=15, group="显示")
+extendLen   = input.int(30,   "延伸K线数",     minval=5, maxval=200, group="显示")
+
+showZone    = input.bool(true, "显示区域带",    group="显示")
+zoneMinPct  = input.float(0.05, "区域最小宽度 (%)", minval=0.02, maxval=0.5, step=0.01, group="显示")
+zoneMaxPct  = input.float(0.4,  "区域最大宽度 (%)", minval=0.1,  maxval=2.0, step=0.05, group="显示")
+showLabels  = input.bool(true, "显示标签",      group="显示")
+showCurrent = input.bool(true, "显示当前价标记", group="显示")
+
+resistColor      = input.color(color.new(#F23645, 15), "阻力线色", group="颜色")
+supportColor     = input.color(color.new(#22AB94, 15), "支撑线色", group="颜色")
+resistZoneColor  = input.color(color.new(#F23645, 90), "阻力区域色", group="颜色")
+supportZoneColor = input.color(color.new(#22AB94, 90), "支撑区域色", group="颜色")
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  ATR + 全局均量
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+atrVal    = ta.atr(14)
+avgVolSma = ta.sma(volume, 50)
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  Swing检测 + 收集
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+swingHigh = ta.pivothigh(high, leftBars, rightBars)
+swingLow  = ta.pivotlow(low,  leftBars, rightBars)
+
+var float[] rawHP = array.new_float()
+var int[]   rawHB = array.new_int()
+var float[] rawHV = array.new_float()
+var float[] rawLP = array.new_float()
+var int[]   rawLB = array.new_int()
+var float[] rawLV = array.new_float()
+
+maxRaw = 100
+
+if not na(swingHigh)
+    array.unshift(rawHP, swingHigh)
+    array.unshift(rawHB, bar_index - rightBars)
+    array.unshift(rawHV, volume[rightBars])
+    if array.size(rawHP) > maxRaw
+        array.pop(rawHP)
+        array.pop(rawHB)
+        array.pop(rawHV)
+
+if not na(swingLow)
+    array.unshift(rawLP, swingLow)
+    array.unshift(rawLB, bar_index - rightBars)
+    array.unshift(rawLV, volume[rightBars])
+    if array.size(rawLP) > maxRaw
+        array.pop(rawLP)
+        array.pop(rawLB)
+        array.pop(rawLV)
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  Level 类型
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+type Level
+    float price
+    float priceMin
+    float priceMax
+    int   touches
+    int   firstBar
+    int   lastBar
+    float avgVol
+    float strength   // 原始强度
+    float score      // 归一化评分 0~10
+    string grade     // 等级 S/A/B/C
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  聚类合并
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+mergeLevels(float[] prices, int[] bars, float[] vols, float gAvgVol) =>
+    Level[] result = array.new<Level>()
+
+    float[] fp = array.new_float()
+    int[]   fb = array.new_int()
+    float[] fv = array.new_float()
+    cutoff = bar_index - lookback
+    for i = 0 to array.size(prices) - 1
+        b = array.get(bars, i)
+        if b >= cutoff
+            array.push(fp, array.get(prices, i))
+            array.push(fb, b)
+            array.push(fv, array.get(vols, i))
+
+    sz = array.size(fp)
+    if sz == 0
+        result
+    else
+        // 按价格排序
+        if sz > 1
+            for i = 0 to sz - 2
+                for j = 0 to sz - i - 2
+                    if array.get(fp, j) > array.get(fp, j + 1)
+                        tmpP = array.get(fp, j)
+                        tmpB = array.get(fb, j)
+                        tmpV = array.get(fv, j)
+                        array.set(fp, j, array.get(fp, j + 1))
+                        array.set(fb, j, array.get(fb, j + 1))
+                        array.set(fv, j, array.get(fv, j + 1))
+                        array.set(fp, j + 1, tmpP)
+                        array.set(fb, j + 1, tmpB)
+                        array.set(fv, j + 1, tmpV)
+
+        // 贪心合并
+        sumP   = array.get(fp, 0)
+        pMin   = array.get(fp, 0)
+        pMax   = array.get(fp, 0)
+        minB   = array.get(fb, 0)
+        maxB   = array.get(fb, 0)
+        sumV   = array.get(fv, 0)
+        cnt    = 1
+        for i = 1 to sz - 1
+            curAvg = sumP / cnt
+            nextP  = array.get(fp, i)
+            nextB  = array.get(fb, i)
+            nextV  = array.get(fv, i)
+            diff   = math.abs(nextP - curAvg) / curAvg * 100
+            if diff < mergePct
+                sumP += nextP
+                pMin := math.min(pMin, nextP)
+                pMax := math.max(pMax, nextP)
+                cnt  += 1
+                minB := math.min(minB, nextB)
+                maxB := math.max(maxB, nextB)
+                sumV += nextV
+            else
+                avgP = sumP / cnt
+                aVol = sumV / cnt
+                array.push(result, Level.new(avgP, pMin, pMax, cnt, minB, maxB, aVol, 0.0, 0.0, ""))
+                sumP := nextP
+                pMin := nextP
+                pMax := nextP
+                minB := nextB
+                maxB := nextB
+                sumV := nextV
+                cnt  := 1
+        avgP = sumP / cnt
+        aVol = sumV / cnt
+        array.push(result, Level.new(avgP, pMin, pMax, cnt, minB, maxB, aVol, 0.0, 0.0, ""))
+
+        // ── 评分 ──
+        // 分项打分后加权，最后归一化到 0~10
+        maxStr = 0.0
+        for i = 0 to array.size(result) - 1
+            lv = array.get(result, i)
+
+            // 1) 触碰分 (0~4): 1次=0.5, 2次=1.5, 3次=2.5, 4+次=4
+            touchScore = lv.touches >= 4 ? 4.0 : lv.touches >= 3 ? 2.5 : lv.touches >= 2 ? 1.5 : 0.5
+
+            // 2) 时效分 (0~3): 最近触碰越近分越高
+            recency = lookback > 0 ? (lv.lastBar - cutoff) / lookback : 0.5
+            recencyScore = math.min(recency * 3.0, 3.0)
+
+            // 3) 成交量分 (0~2): 相对全局均量
+            volRatio = gAvgVol > 0 ? lv.avgVol / gAvgVol : 1.0
+            volScore = math.min(volRatio * 1.0, 2.0)
+
+            // 4) 时间跨度分 (0~1): 首次到末次跨越的bar
+            span = lv.lastBar - lv.firstBar
+            spanScore = span > 150 ? 1.0 : span > 80 ? 0.7 : span > 30 ? 0.4 : 0.1
+
+            rawStr = touchScore + recencyScore + volScore + spanScore
+            lv.strength := rawStr
+            if rawStr > maxStr
+                maxStr := rawStr
+
+        // 归一化到 0~10 + 分等级
+        for i = 0 to array.size(result) - 1
+            lv = array.get(result, i)
+            lv.score := maxStr > 0 ? (lv.strength / maxStr) * 10.0 : 5.0
+            lv.grade := lv.score >= 8.0 ? "4" : lv.score >= 6.0 ? "3" : lv.score >= 3.5 ? "2" : "1"
+
+        result
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  动态区域宽度
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+calcZoneHalf(Level lv, float curATR, float globalAvgVol) =>
+    clusterSpread = (lv.priceMax - lv.priceMin) / 2
+    atrBase = curATR * 0.2
+    volFactor = globalAvgVol > 0 ? math.min(lv.avgVol / globalAvgVol, 3.0) : 1.0
+    volFactor := math.max(volFactor, 0.3)
+    barSpan  = lv.lastBar - lv.firstBar
+    timeFactor = barSpan > 100 ? 1.3 : barSpan > 50 ? 1.1 : 1.0
+    touchFactor = lv.touches >= 4 ? 1.4 : lv.touches >= 3 ? 1.2 : lv.touches >= 2 ? 1.1 : 0.8
+    raw = math.max(clusterSpread, atrBase) * volFactor * timeFactor * touchFactor
+    minHalf = lv.price * zoneMinPct / 100
+    maxHalf = lv.price * zoneMaxPct / 100
+    math.max(math.min(raw, maxHalf), minHalf)
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  等级对应的视觉参数
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+gradeLineWidth(string g) =>
+    g == "4" ? 4 : g == "3" ? 3 : g == "2" ? 2 : 1
+
+gradeLineStyle(string g) =>
+    g == "4" ? line.style_solid : g == "3" ? line.style_solid : g == "2" ? line.style_dashed : line.style_dotted
+
+gradeAlpha(string g) =>
+    g == "4" ? 0 : g == "3" ? 15 : g == "2" ? 40 : 65
+
+gradeZoneAlpha(string g) =>
+    g == "4" ? 82 : g == "3" ? 87 : g == "2" ? 92 : 95
+
+gradeLabelSize(string g) =>
+    g == "4" ? size.normal : g == "3" ? size.small : size.tiny
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  绘制
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+if barstate.islast
+    // 清除
+    for i = 0 to array.size(line.all) - 1
+        if array.size(line.all) > 0
+            line.delete(array.shift(line.all))
+    for i = 0 to array.size(label.all) - 1
+        if array.size(label.all) > 0
+            label.delete(array.shift(label.all))
+    for i = 0 to array.size(box.all) - 1
+        if array.size(box.all) > 0
+            box.delete(array.shift(box.all))
+
+    curPrice = close
+    curATR   = nz(atrVal, curPrice * 0.01)
+    gAvgVol  = nz(avgVolSma, 1.0)
+
+    // ─── 阻力位 ───
+    Level[] resistAll = mergeLevels(rawHP, rawHB, rawHV, gAvgVol)
+    Level[] resistAbove = array.new<Level>()
+    for i = 0 to array.size(resistAll) - 1
+        lv = array.get(resistAll, i)
+        if lv.price > curPrice * 1.001
+            array.push(resistAbove, lv)
+
+    // 按 score 降序
+    if array.size(resistAbove) > 1
+        for i = 0 to array.size(resistAbove) - 2
+            for j = 0 to array.size(resistAbove) - i - 2
+                if array.get(resistAbove, j).score < array.get(resistAbove, j + 1).score
+                    tmp = array.get(resistAbove, j)
+                    array.set(resistAbove, j, array.get(resistAbove, j + 1))
+                    array.set(resistAbove, j + 1, tmp)
+
+    drawnR = 0
+    for i = 0 to array.size(resistAbove) - 1
+        if drawnR >= maxResist
+            break
+        lv = array.get(resistAbove, i)
+        w  = gradeLineWidth(lv.grade)
+        ls = gradeLineStyle(lv.grade)
+        a  = gradeAlpha(lv.grade)
+        za = gradeZoneAlpha(lv.grade)
+        lsz = gradeLabelSize(lv.grade)
+        lc = color.new(resistColor, a)
+        zc = color.new(resistZoneColor, za)
+
+        line.new(lv.firstBar, lv.price, bar_index + extendLen, lv.price,
+             color=lc, width=w, style=ls)
+
+        if showZone
+            hz = calcZoneHalf(lv, curATR, gAvgVol)
+            box.new(lv.firstBar, lv.price + hz, bar_index + extendLen, lv.price - hz,
+                 bgcolor=zc, border_color=color.new(color.white, 100))
+
+        if showLabels
+            dist = (lv.price - curPrice) / curPrice * 100
+            txt = "压力" + lv.grade
+            txt += "  " + str.tostring(lv.price, format.mintick)
+            txt += "  +" + str.tostring(dist, "#.##") + "%"
+            if lv.touches > 1
+                txt += "  触碰" + str.tostring(lv.touches) + "次"
+            label.new(bar_index + extendLen, lv.price, txt,
+                 style=label.style_label_left,
+                 color=color.new(color.white, 100),
+                 textcolor=color.new(resistColor, a),
+                 size=lsz)
+        drawnR += 1
+
+    // ─── 支撑位 ───
+    Level[] supportAll = mergeLevels(rawLP, rawLB, rawLV, gAvgVol)
+    Level[] supportBelow = array.new<Level>()
+    for i = 0 to array.size(supportAll) - 1
+        lv = array.get(supportAll, i)
+        if lv.price < curPrice * 0.999
+            array.push(supportBelow, lv)
+
+    if array.size(supportBelow) > 1
+        for i = 0 to array.size(supportBelow) - 2
+            for j = 0 to array.size(supportBelow) - i - 2
+                if array.get(supportBelow, j).score < array.get(supportBelow, j + 1).score
+                    tmp = array.get(supportBelow, j)
+                    array.set(supportBelow, j, array.get(supportBelow, j + 1))
+                    array.set(supportBelow, j + 1, tmp)
+
+    drawnS = 0
+    for i = 0 to array.size(supportBelow) - 1
+        if drawnS >= maxSupport
+            break
+        lv = array.get(supportBelow, i)
+        w  = gradeLineWidth(lv.grade)
+        ls = gradeLineStyle(lv.grade)
+        a  = gradeAlpha(lv.grade)
+        za = gradeZoneAlpha(lv.grade)
+        lsz = gradeLabelSize(lv.grade)
+        lc = color.new(supportColor, a)
+        zc = color.new(supportZoneColor, za)
+
+        line.new(lv.firstBar, lv.price, bar_index + extendLen, lv.price,
+             color=lc, width=w, style=ls)
+
+        if showZone
+            hz = calcZoneHalf(lv, curATR, gAvgVol)
+            box.new(lv.firstBar, lv.price + hz, bar_index + extendLen, lv.price - hz,
+                 bgcolor=zc, border_color=color.new(color.white, 100))
+
+        if showLabels
+            dist = (curPrice - lv.price) / curPrice * 100
+            txt = "支撑" + lv.grade
+            txt += "  " + str.tostring(lv.price, format.mintick)
+            txt += "  -" + str.tostring(dist, "#.##") + "%"
+            if lv.touches > 1
+                txt += "  触碰" + str.tostring(lv.touches) + "次"
+            label.new(bar_index + extendLen, lv.price, txt,
+                 style=label.style_label_left,
+                 color=color.new(color.white, 100),
+                 textcolor=color.new(supportColor, a),
+                 size=lsz)
+        drawnS += 1
+
+    // ─── 当前价标线 ───
+    if showCurrent
+        line.new(bar_index - 20, curPrice, bar_index + extendLen, curPrice,
+             color=color.new(color.gray, 50), width=1, style=line.style_dotted)
+        label.new(bar_index + extendLen, curPrice,
+             str.tostring(curPrice, format.mintick),
+             style=label.style_label_left,
+             color=color.new(color.white, 100),
+             textcolor=color.gray,
+             size=size.small)

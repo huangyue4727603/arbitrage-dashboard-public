@@ -29,19 +29,6 @@ export default function PriceTrend() {
     }
   }, []);
 
-  const handleRefresh = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await priceTrendApi.refresh();
-      setData(res.data);
-      setLastRefresh(new Date().toLocaleString());
-      message.success('Price trend data refreshed');
-    } catch {
-      message.error('Failed to refresh price trend data');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
   // Initial load + 1 min auto refresh
   useEffect(() => {

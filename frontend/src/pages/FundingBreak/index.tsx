@@ -122,7 +122,6 @@ export default function FundingBreak() {
     return list;
   }, [data, exchange, interval, breakingFilter]);
 
-  const breakingCount = useMemo(() => data.filter((item) => item.is_breaking).length, [data]);
 
   const columns: ColumnsType<DisplayItem> = [
     {
