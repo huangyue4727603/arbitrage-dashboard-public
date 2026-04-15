@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { notification } from 'antd';
 import { useWsStore } from '../stores/wsStore';
 import type { WsChannel } from '../stores/wsStore';
 
