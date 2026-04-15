@@ -401,12 +401,22 @@ class AlertEngine:
         db: AsyncSession,
     ) -> None:
         """Send notification through configured channels (sound/popup via WS, Lark via webhook)."""
+        # Check user's global notification settings
+        from app.models.user import User
+        user_result = await db.execute(
+            select(User.sound_enabled, User.popup_enabled)
+            .where(User.id == user_id)
+        )
+        user_row = user_result.first()
+        global_sound = user_row[0] if user_row else True
+        global_popup = user_row[1] if user_row else True
+
         # WebSocket notification with sound/popup flags
         ws_data = {
             "title": title,
             "content": content,
-            "sound_enabled": config.get("sound_enabled", True),
-            "popup_enabled": config.get("popup_enabled", True),
+            "sound_enabled": global_sound and config.get("sound_enabled", True),
+            "popup_enabled": global_popup and config.get("popup_enabled", True),
             "alert": alert_payload,
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }

@@ -193,11 +193,7 @@ class BasisMonitorService:
                             "popup_enabled": info["should_popup"],
                         })
 
-                        # macOS system-level alerts (works regardless of active window)
-                        if info["should_sound"]:
-                            _system_sound()
-                        if info["should_popup"]:
-                            _system_popup(title, display)
+                        # macOS system alerts removed - handled per-user via WebSocket
 
                         logger.info("Sent basis alert notification to user %d: %d coins", uid, len(coins_summary))
 

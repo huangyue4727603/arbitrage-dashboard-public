@@ -314,81 +314,55 @@ class KlineScheduler:
                 await db.rollback()
 
     async def refresh_price_changes(self) -> None:
-        """Compute 1d/3d price changes.
-
-        1d: Binance GET /fapi/v1/ticker/24hr (1 API call, all symbols).
-        3d: from DB 1d klines.
-        """
+        """Compute 1d/3d price changes from DB kline data only (no API calls)."""
         try:
             changes: dict[str, dict[str, Any]] = {}
 
-            # --- 1d: Binance 24hr ticker (single API call) ---
-            try:
-                async with BinanceClient() as client:
-                    tickers = await client.get_24hr_ticker(timeout=20)
-                if isinstance(tickers, list):
-                    for t in tickers:
-                        symbol = t.get("symbol", "")
-                        if not symbol.endswith("USDT"):
-                            continue
-                        pct = t.get("priceChangePercent")
-                        if pct is not None:
-                            coin = symbol[:-4]
-                            changes[coin] = {"change_1d": round(float(pct), 2)}
-                    logger.info("1d price changes from ticker API: %d coins", len(changes))
-                else:
-                    logger.warning("1d ticker returned non-list: %s", type(tickers))
-            except Exception as exc:
-                logger.error("Failed to fetch 24hr ticker: %s", exc)
-
-            # --- 1d fallback: from DB 1h klines (when ticker API failed) ---
+            # --- 24h change: from DB 5m klines (latest vs 24h ago) ---
             try:
                 now = datetime.now()
-                t_1d = now - timedelta(hours=24)
+                t_24h = now - timedelta(hours=24)
                 async with async_session_factory() as db:
-                    latest_1h_subq = (
+                    # Latest 5m close per symbol
+                    latest_subq = (
                         select(PriceKline.symbol, func.max(PriceKline.kline_time).label("mt"))
-                        .where(PriceKline.interval_type == "1h")
+                        .where(PriceKline.interval_type == "5m")
                         .group_by(PriceKline.symbol)
                         .subquery()
                     )
-                    latest_1h = await db.execute(
+                    latest_res = await db.execute(
                         select(PriceKline.symbol, PriceKline.close_price)
-                        .join(latest_1h_subq, (PriceKline.symbol == latest_1h_subq.c.symbol) &
-                              (PriceKline.kline_time == latest_1h_subq.c.mt))
-                        .where(PriceKline.interval_type == "1h")
+                        .join(latest_subq, (PriceKline.symbol == latest_subq.c.symbol) &
+                              (PriceKline.kline_time == latest_subq.c.mt))
+                        .where(PriceKline.interval_type == "5m")
                     )
-                    latest_1h_prices = {row[0]: row[1] for row in latest_1h.all()}
+                    latest_prices = {row[0]: row[1] for row in latest_res.all()}
 
-                    lo, hi = t_1d - timedelta(hours=2), t_1d + timedelta(hours=2)
-                    subq_1d = (
+                    # 24h ago close (nearest 5m candle in ±30min window)
+                    lo, hi = t_24h - timedelta(minutes=30), t_24h + timedelta(minutes=30)
+                    old_subq = (
                         select(PriceKline.symbol, func.max(PriceKline.kline_time).label("nt"))
-                        .where(PriceKline.interval_type == "1h")
+                        .where(PriceKline.interval_type == "5m")
                         .where(PriceKline.kline_time.between(lo, hi))
                         .group_by(PriceKline.symbol)
                         .subquery()
                     )
-                    res_1d = await db.execute(
+                    old_res = await db.execute(
                         select(PriceKline.symbol, PriceKline.close_price)
-                        .where(PriceKline.interval_type == "1h")
-                        .join(subq_1d, (PriceKline.symbol == subq_1d.c.symbol) &
-                              (PriceKline.kline_time == subq_1d.c.nt))
+                        .join(old_subq, (PriceKline.symbol == old_subq.c.symbol) &
+                              (PriceKline.kline_time == old_subq.c.nt))
+                        .where(PriceKline.interval_type == "5m")
                     )
-                    prices_1d = {row[0]: row[1] for row in res_1d.all()}
+                    old_prices = {row[0]: row[1] for row in old_res.all()}
 
-                added = 0
-                for symbol, current in latest_1h_prices.items():
-                    coin = symbol[:-4] if symbol.endswith("USDT") else symbol
-                    if coin in changes and "change_1d" in changes[coin]:
-                        continue
-                    old_1d = prices_1d.get(symbol)
-                    if old_1d and old_1d > 0:
-                        c1d = round((current - old_1d) / old_1d * 100, 2)
-                        changes.setdefault(coin, {})["change_1d"] = c1d
-                        added += 1
-                logger.info("1d price changes from DB fallback: %d coins", added)
+                for symbol, current in latest_prices.items():
+                    old = old_prices.get(symbol)
+                    if old and old > 0:
+                        coin = symbol[:-4] if symbol.endswith("USDT") else symbol
+                        changes[coin] = {"change_1d": round((current - old) / old * 100, 2)}
+                logger.info("24h price changes from DB 5m klines: %d coins", len(changes))
             except Exception as exc:
-                logger.error("Failed to compute 1d fallback: %s", exc)
+                logger.error("Failed to compute 24h changes: %s", exc)
 
             # --- 3d: from DB 1d klines ---
             try:

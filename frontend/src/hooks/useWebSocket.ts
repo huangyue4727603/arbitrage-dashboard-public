@@ -68,31 +68,7 @@ export function useWebSocket(token?: string | null) {
           if (msg.channel === 'alert_notification' && isAlertNotification(msg.data)) {
             const alertData = msg.data;
 
-            if (alertData.popup_enabled !== false) {
-              // System-level notification (appears on top of all windows)
-              if ('Notification' in window && Notification.permission === 'granted') {
-                new Notification(alertData.title, {
-                  body: alertData.message,
-                  requireInteraction: true, // Must click to dismiss
-                });
-              } else if ('Notification' in window && Notification.permission !== 'denied') {
-                Notification.requestPermission().then((perm) => {
-                  if (perm === 'granted') {
-                    new Notification(alertData.title, {
-                      body: alertData.message,
-                      requireInteraction: true,
-                    });
-                  }
-                });
-              }
-              // Also show in-page notification as fallback
-              notification.warning({
-                message: alertData.title,
-                description: alertData.message,
-                duration: 0,
-                placement: 'topRight',
-              });
-            }
+            // Browser popups disabled — system-level popups handled by backend
 
             if (alertData.sound_enabled !== false) {
               const audio = new Audio('/alert.wav');

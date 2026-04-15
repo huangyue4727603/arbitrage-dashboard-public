@@ -64,10 +64,7 @@ class BasisAlertScheduler:
         self._multiplier: float = DEFAULT_MULTIPLIER
         self._minor_delta: float = DEFAULT_MINOR_DELTA
         self._blocked_coins: set = set()
-        self._sound_enabled: bool = True
-        self._popup_enabled: bool = True
-        self._global_sound: bool = True
-        self._global_popup: bool = True
+        self._user_configs: Dict[int, dict] = {}  # uid -> {threshold, multiplier, blocked_coins, sound, popup}
         self._config_last_refresh: float = 0
         self._running: bool = False
 
@@ -122,10 +119,10 @@ class BasisAlertScheduler:
         self._config_last_refresh = 0
 
     async def _refresh_config(self) -> None:
-        """Load user config from DB (refresh every 5s).
+        """Load all users' configs from DB (refresh every 5s).
 
-        Merges all users' configs: uses the most lenient threshold
-        (closest to 0) so every user's alerts can fire.
+        Stores per-user configs for independent threshold/notification checks.
+        Global threshold uses the most lenient value for the scan pass.
         """
         import time
         now = time.time()
@@ -148,89 +145,95 @@ class BasisAlertScheduler:
                         BasisAlertConfig.sound_enabled,
                         BasisAlertConfig.popup_enabled,
                         BasisAlertConfig.user_id,
-                    )
+                        User.sound_enabled,
+                        User.popup_enabled,
+                    ).join(User, User.id == BasisAlertConfig.user_id)
                 )
                 rows = result.all()
                 if rows:
-                    # Use the most lenient threshold (closest to 0)
-                    self._threshold = max(r[0] for r in rows) / 100
-                    # Use the smallest multiplier (most sensitive)
-                    self._multiplier = min(r[1] for r in rows)
-                    # Intersect blocked coins (only block if ALL users block it)
-                    blocked_sets = []
+                    # Store per-user configs
+                    self._user_configs = {}
                     for r in rows:
+                        uid = r[5]
+                        blocked = set()
                         if r[2]:
-                            blocked_sets.append({c.strip().upper() for c in r[2].split(",") if c.strip()})
-                        else:
-                            blocked_sets.append(set())
-                    if blocked_sets:
-                        self._blocked_coins = set.intersection(*blocked_sets) if all(blocked_sets) else set()
-                    else:
-                        self._blocked_coins = set()
-                    # Sound/popup: enable if any user enables
-                    self._sound_enabled = any(r[3] for r in rows)
-                    self._popup_enabled = any(r[4] for r in rows)
-
-                    # Get global settings from first user
-                    user_result = await db.execute(
-                        select(User.sound_enabled, User.popup_enabled)
-                        .where(User.id == rows[0][5])
-                    )
-                    user_row = user_result.first()
-                    if user_row:
-                        self._global_sound = user_row[0]
-                        self._global_popup = user_row[1]
+                            blocked = {c.strip().upper() for c in r[2].split(",") if c.strip()}
+                        self._user_configs[uid] = {
+                            "threshold": r[0] / 100,
+                            "multiplier": r[1],
+                            "blocked_coins": blocked,
+                            "sound": r[6] and r[3],  # global AND alert
+                            "popup": r[7] and r[4],   # global AND alert
+                        }
+                    # Global threshold = most lenient (for scan pass)
+                    self._threshold = max(r[0] for r in rows) / 100
+                    # Global multiplier = most sensitive
+                    self._multiplier = min(r[1] for r in rows)
+                    # Only block coins ALL users block
+                    blocked_sets = [cfg["blocked_coins"] for cfg in self._user_configs.values()]
+                    self._blocked_coins = set.intersection(*blocked_sets) if blocked_sets and all(blocked_sets) else set()
         except Exception as exc:
             logger.debug("Failed to refresh basis alert config: %s", exc)
 
     async def _persist_alert(self, coin: str, alert_type: str, basis: float) -> None:
-        """Write alert to DB."""
+        """Write alert to DB only for users whose threshold is met."""
         try:
             from app.database import async_session_factory
             from app.models.alert_history import BasisAlertHistory
-            from app.models.alert_config import BasisAlertConfig
-            from sqlalchemy import select
 
             async with async_session_factory() as db:
-                result = await db.execute(select(BasisAlertConfig.user_id))
-                user_ids = [row[0] for row in result.all()]
-                for uid in user_ids:
+                for uid, cfg in self._user_configs.items():
+                    # Only persist if this coin's basis meets this user's threshold
+                    if basis > cfg["threshold"]:
+                        continue
+                    if coin.upper() in cfg["blocked_coins"]:
+                        continue
                     db_type = "new" if alert_type == "新机会" else "expand"
                     db.add(BasisAlertHistory(
                         user_id=uid,
                         coin_name=coin,
                         alert_type=db_type,
-                        basis_value=basis * 100,  # Store as percentage
+                        basis_value=basis * 100,
                     ))
                 await db.commit()
         except Exception as exc:
             logger.debug("Failed to persist basis alert: %s", exc)
 
-    async def _notify(self, title: str, message: str, sound: bool, popup: bool) -> None:
-        """Send notification via WebSocket + macOS system alerts."""
-        # WebSocket browser notification (works on server + local)
+    async def _notify(self, title: str, message: str, basis: float, coin: str) -> None:
+        """Send notification per user based on their own threshold and settings."""
         try:
             from app.websocket.manager import manager
-            from app.models.alert_config import BasisAlertConfig
-            from app.database import async_session_factory
-            from sqlalchemy import select
 
-            async with async_session_factory() as db:
-                result = await db.execute(select(BasisAlertConfig.user_id))
-                for row in result.all():
-                    await manager.send_personal(row[0], "alert_notification", {
-                        "title": title,
-                        "message": message,
-                        "sound_enabled": sound,
-                        "popup_enabled": popup,
-                    })
+            any_sound = False
+            any_popup = False
+            # Get currently connected user IDs
+            online_uids = set(manager._user_connections.keys())
+
+            for uid, cfg in self._user_configs.items():
+                # Skip if basis doesn't meet this user's threshold
+                if basis > cfg["threshold"]:
+                    continue
+                if coin.upper() in cfg["blocked_coins"]:
+                    continue
+                await manager.send_personal(uid, "alert_notification", {
+                    "title": title,
+                    "message": message,
+                    "sound_enabled": cfg["sound"],
+                    "popup_enabled": cfg["popup"],
+                })
+                # Only count online users for system alerts
+                if uid in online_uids:
+                    if cfg["sound"]:
+                        any_sound = True
+                    if cfg["popup"]:
+                        any_popup = True
         except Exception as exc:
             logger.debug("WS notify failed: %s", exc)
 
-        # macOS system alerts (local dev only, silently fails on Linux)
-        if sound:
+        # macOS system alerts (only if online user has it enabled)
+        if any_sound:
             _system_sound()
-        if popup:
+        if any_popup:
             _system_popup(title, message)
 
     async def tick(self) -> None:
@@ -273,7 +276,6 @@ class BasisAlertScheduler:
 
                 if coin not in self._history:
                     # --- 新机会: first time seeing this coin below threshold ---
-                    # Optional: check funding rate condition
                     self._history[coin] = curr_abs
                     event = {
                         "coin_name": coin,
@@ -284,14 +286,10 @@ class BasisAlertScheduler:
                     }
                     self._timeline.insert(0, event)
                     await self._persist_alert(coin, "新机会", basis)
-
-                    should_sound = self._global_sound and self._sound_enabled
-                    should_popup = self._global_popup and self._popup_enabled
-
                     await self._notify(
                         "基差预警 - 新机会",
                         f"{coin}: 基差 {basis * 100:.3f}%",
-                        should_sound, should_popup,
+                        basis, coin,
                     )
                     logger.info("[新机会] %s: 基差 %.3f%%", coin, basis * 100)
 
@@ -299,7 +297,7 @@ class BasisAlertScheduler:
                     hist_abs = self._history[coin]
 
                     if curr_abs > hist_abs * self._multiplier:
-                        # --- 显著扩大: significant expansion → sound ---
+                        # --- 显著扩大: significant expansion ---
                         self._history[coin] = curr_abs
                         event = {
                             "coin_name": coin,
@@ -310,20 +308,16 @@ class BasisAlertScheduler:
                         }
                         self._timeline.insert(0, event)
                         await self._persist_alert(coin, "基差扩大", basis)
-
-                        should_sound = self._global_sound and self._sound_enabled
-                        should_popup = self._global_popup and self._popup_enabled
-
                         await self._notify(
                             "基差预警 - 显著扩大",
                             f"{coin}: {basis * 100:.3f}% (历史: -{hist_abs * 100:.3f}%)",
-                            should_sound, should_popup,
+                            basis, coin,
                         )
                         logger.info("[显著扩大] %s: %.3f%% (历史: -%.3f%%)",
                                     coin, basis * 100, hist_abs * 100)
 
                     elif curr_abs > hist_abs + self._minor_delta:
-                        # --- 小幅增长: minor expansion → popup only, no sound ---
+                        # --- 小幅增长: minor expansion ---
                         self._history[coin] = curr_abs
                         event = {
                             "coin_name": coin,
@@ -334,12 +328,10 @@ class BasisAlertScheduler:
                         }
                         self._timeline.insert(0, event)
                         await self._persist_alert(coin, "基差扩大", basis)
-
-                        should_popup = self._global_popup and self._popup_enabled
                         await self._notify(
                             "基差预警 - 小幅扩大",
                             f"{coin}: {basis * 100:.3f}%",
-                            False, should_popup,
+                            basis, coin,
                         )
                         logger.info("[小幅扩大] %s: %.3f%%", coin, basis * 100)
 
