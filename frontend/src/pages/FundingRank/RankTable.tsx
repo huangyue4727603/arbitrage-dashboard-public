@@ -1,6 +1,8 @@
-import { Table } from 'antd';
+import { useState } from 'react';
+import { Table, Modal } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { RankItem } from '../../api/funding';
+import { fundingApi } from '../../api/funding';
 
 interface RankTableProps {
   data: RankItem[];
@@ -12,6 +14,19 @@ interface RankTableProps {
 const exLabel: Record<string, string> = { BN: 'BN', OKX: 'OKX', BY: 'BY' };
 
 export default function RankTable({ data, loading, onDiffClick, onWatchToggle }: RankTableProps) {
+  const [indexModal, setIndexModal] = useState<{ coin: string; long_exchange: string; short_exchange: string } | null>(null);
+  const [indexDetail, setIndexDetail] = useState<{ exchange: string; long_weight: number; short_weight: number; common: boolean }[] | null>(null);
+
+  const showIndexDetail = async (record: RankItem) => {
+    setIndexModal({ coin: record.coin, long_exchange: record.long_exchange, short_exchange: record.short_exchange });
+    try {
+      const res = await fundingApi.getIndexDetail(record.coin, record.long_exchange, record.short_exchange);
+      setIndexDetail(res.data);
+    } catch {
+      setIndexDetail([]);
+    }
+  };
+
   const columns: ColumnsType<RankItem> = [
     {
       title: '',
@@ -202,9 +217,31 @@ export default function RankTable({ data, loading, onDiffClick, onWatchToggle }:
       render: (val?: number) =>
         val ? <span style={{ color: '#E6A700' }}>{(val * 100).toFixed(1)}%</span> : <span style={{ color: '#d9d9d9' }}>—</span>,
     },
+    {
+      title: '共同指数',
+      dataIndex: 'index_overlap',
+      key: 'index_overlap',
+      width: 80,
+      sorter: (a, b) => (a.index_overlap ?? 0) - (b.index_overlap ?? 0),
+      render: (val: number | undefined, record: RankItem) =>
+        val !== undefined && val > 0 ? (
+          <span
+            onClick={(e) => { e.stopPropagation(); showIndexDetail(record); }}
+            style={{ color: '#1677ff', cursor: 'pointer' }}
+          >
+            {(val * 100).toFixed(1)}%
+          </span>
+        ) : (
+          <span
+            onClick={(e) => { e.stopPropagation(); showIndexDetail(record); }}
+            style={{ color: '#d9d9d9', cursor: 'pointer' }}
+          >0%</span>
+        ),
+    },
   ];
 
   return (
+    <>
     <Table<RankItem>
       columns={columns}
       dataSource={data}
@@ -212,8 +249,39 @@ export default function RankTable({ data, loading, onDiffClick, onWatchToggle }:
       rowKey={(record) => `${record.coin}_${record.long_exchange}_${record.short_exchange}`}
       pagination={{ pageSize: 50, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
       size="small"
-      scroll={{ x: 1500 }}
+      scroll={{ x: 1600 }}
       style={{ fontSize: 13 }}
     />
+    <Modal
+      title={indexModal ? `${indexModal.coin} 指数成分（${exLabel[indexModal.long_exchange] || indexModal.long_exchange} vs ${exLabel[indexModal.short_exchange] || indexModal.short_exchange}）` : ''}
+      open={!!indexModal}
+      onCancel={() => setIndexModal(null)}
+      footer={null}
+      width={600}
+    >
+      {indexDetail && (
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <thead>
+            <tr style={{ borderBottom: '2px solid #eee', textAlign: 'left' }}>
+              <th style={{ padding: '6px 8px' }}>交易所</th>
+              <th style={{ padding: '6px 8px' }}>做多方权重</th>
+              <th style={{ padding: '6px 8px' }}>做空方权重</th>
+              <th style={{ padding: '6px 8px' }}>共同</th>
+            </tr>
+          </thead>
+          <tbody>
+            {indexDetail.map((row, i) => (
+              <tr key={i} style={{ borderBottom: '1px solid #f0f0f0', backgroundColor: row.common ? '#f6ffed' : undefined }}>
+                <td style={{ padding: '5px 8px' }}>{row.exchange}</td>
+                <td style={{ padding: '5px 8px' }}>{row.long_weight ? (row.long_weight * 100).toFixed(2) + '%' : '—'}</td>
+                <td style={{ padding: '5px 8px' }}>{row.short_weight ? (row.short_weight * 100).toFixed(2) + '%' : '—'}</td>
+                <td style={{ padding: '5px 8px', color: row.common ? '#22AB94' : '#d9d9d9' }}>{row.common ? '✓' : '✗'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </Modal>
+    </>
   );
 }

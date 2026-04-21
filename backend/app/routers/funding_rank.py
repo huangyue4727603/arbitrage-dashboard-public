@@ -153,13 +153,7 @@ async def get_price_changes():
 
 @router.get("/index-overlap")
 async def get_index_overlap():
-    """Return index-constituent overlap percentage for every (coin, long_ex, short_ex) combo.
-
-    Computed in SQL: for each (coin, ex_a, ex_b) pair, sum LEAST(weight_a, weight_b)
-    over shared spot_exchange names. Result is 0..1.
-
-    Response: {"BTC_BN_OKX": 0.55, "BTC_OKX_BN": 0.55, ...}
-    """
+    """Return index-constituent overlap percentage using normalized spot_exchange names."""
     from sqlalchemy import text
     from app.database import async_session_factory
 
@@ -167,10 +161,12 @@ async def get_index_overlap():
         SELECT a.coin, a.exchange AS ex_a, b.exchange AS ex_b,
                SUM(LEAST(a.weight, b.weight)) AS overlap
         FROM arb_index_constituents a
+        JOIN arb_spot_exchange_mapping ma ON a.spot_exchange = ma.raw_name
         JOIN arb_index_constituents b
           ON a.coin = b.coin
          AND a.exchange <> b.exchange
-         AND LOWER(a.spot_exchange) = LOWER(b.spot_exchange)
+        JOIN arb_spot_exchange_mapping mb ON b.spot_exchange = mb.raw_name
+        WHERE ma.normalized_name = mb.normalized_name
         GROUP BY a.coin, a.exchange, b.exchange
     """)
     out: dict = {}
@@ -179,6 +175,56 @@ async def get_index_overlap():
         for coin, ex_a, ex_b, overlap in r.all():
             out[f"{coin}_{ex_a}_{ex_b}"] = round(float(overlap or 0), 4)
     return {"data": out}
+
+
+@router.get("/index-detail")
+async def get_index_detail(coin: str, long_exchange: str, short_exchange: str):
+    """Return detailed index constituents for a coin on two exchanges, with normalized names.
+
+    Groups by normalized spot_exchange, shows weight from each exchange side by side.
+    """
+    from sqlalchemy import text
+    from app.database import async_session_factory
+
+    # Exchange key to DB exchange column mapping
+    ex_map = {"BN": "BN", "OKX": "OKX", "BY": "BY"}
+    long_ex = ex_map.get(long_exchange, long_exchange)
+    short_ex = ex_map.get(short_exchange, short_exchange)
+
+    sql = text("""
+        SELECT
+            COALESCE(m.normalized_name, c.spot_exchange) AS norm_exchange,
+            c.exchange,
+            SUM(c.weight) AS weight
+        FROM arb_index_constituents c
+        LEFT JOIN arb_spot_exchange_mapping m ON c.spot_exchange = m.raw_name
+        WHERE c.coin = :coin AND c.exchange IN (:long_ex, :short_ex)
+        GROUP BY norm_exchange, c.exchange
+        ORDER BY norm_exchange
+    """)
+
+    async with async_session_factory() as db:
+        r = await db.execute(sql, {"coin": coin.upper(), "long_ex": long_ex, "short_ex": short_ex})
+        rows = r.all()
+
+    # Build: {norm_exchange: {long_weight, short_weight}}
+    detail: dict[str, dict] = {}
+    for norm, exchange, weight in rows:
+        if norm not in detail:
+            detail[norm] = {"exchange": norm, "long_weight": 0, "short_weight": 0}
+        if exchange == long_ex:
+            detail[norm]["long_weight"] = round(float(weight or 0), 4)
+        elif exchange == short_ex:
+            detail[norm]["short_weight"] = round(float(weight or 0), 4)
+
+    # Mark common (both > 0)
+    result = []
+    for item in sorted(detail.values(), key=lambda x: -(min(x["long_weight"], x["short_weight"]))):
+        item["common"] = item["long_weight"] > 0 and item["short_weight"] > 0
+        result.append(item)
+
+    return {"data": result, "coin": coin.upper(),
+            "long_exchange": long_exchange, "short_exchange": short_exchange}
 
 
 @router.get("/bn-index-weights")

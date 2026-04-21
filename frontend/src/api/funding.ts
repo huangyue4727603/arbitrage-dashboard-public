@@ -143,6 +143,16 @@ export const fundingApi = {
     return map;
   },
 
+  getIndexDetail: async (coin: string, longExchange: string, shortExchange: string): Promise<{
+    data: { exchange: string; long_weight: number; short_weight: number; common: boolean }[];
+    coin: string; long_exchange: string; short_exchange: string;
+  }> => {
+    const res = await client.get('/api/funding-rank/index-detail', {
+      params: { coin, long_exchange: longExchange, short_exchange: shortExchange },
+    });
+    return res.data;
+  },
+
   getOiLsr: async (): Promise<Record<string, { oi?: number; lsr?: number }>> => {
     const res = await client.get('/api/funding-rank/oi-lsr');
     return res.data.data;
