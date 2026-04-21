@@ -44,7 +44,7 @@ export default function FundingRank() {
   const [minBasis, setMinBasis] = useState<number | null>(null);
   const [maxBasis, setMaxBasis] = useState<number | null>(null);
   const [bnSpotFilter, setBnSpotFilter] = useState<string>('');  // '' | 'yes' | 'no'
-  const [trendFilter, setTrendFilter] = useState<string>('');     // '' | 'bullish' | 'none'
+  const [trendFilter, setTrendFilter] = useState<string[]>([]);   // ['daily','h4','h1','m15']
   const [minLsr, setMinLsr] = useState<number | null>(null);
   const [maxLsr, setMaxLsr] = useState<number | null>(null);
   const [coinFilter, setCoinFilter] = useState<string>('');
@@ -207,8 +207,14 @@ export default function FundingRank() {
       if (maxBasis !== null && (item.current_basis ?? 0) > maxBasis) return false;
       if (bnSpotFilter === 'yes' && !item.bn_spot) return false;
       if (bnSpotFilter === 'no' && item.bn_spot) return false;
-      if (trendFilter === 'bullish' && !(item.trend_daily || item.trend_h4 || item.trend_h1 || item.trend_m15)) return false;
-      if (trendFilter === 'none' && (item.trend_daily || item.trend_h4 || item.trend_h1 || item.trend_m15)) return false;
+      if (trendFilter.length > 0) {
+        for (const t of trendFilter) {
+          if (t === 'daily' && !item.trend_daily) return false;
+          if (t === 'h4' && !item.trend_h4) return false;
+          if (t === 'h1' && !item.trend_h1) return false;
+          if (t === 'm15' && !item.trend_m15) return false;
+        }
+      }
       if (minLsr !== null && (item.lsr ?? 999) < minLsr) return false;
       if (maxLsr !== null && (item.lsr ?? 0) > maxLsr) return false;
       return true;
@@ -445,8 +451,20 @@ export default function FundingRank() {
 
         <div className={s.filterGroup}>
           <span className={s.filterLabel}>价格趋势</span>
-          <Select value={trendFilter || undefined} onChange={(v) => setTrendFilter(v || '')} allowClear placeholder="全部" style={{ width: 100 }}
-            options={[{ label: '有多头', value: 'bullish' }, { label: '无多头', value: 'none' }]} />
+          <Select
+            mode="multiple"
+            value={trendFilter}
+            onChange={setTrendFilter}
+            allowClear
+            placeholder="全部"
+            style={{ minWidth: 100, maxWidth: 220 }}
+            options={[
+              { label: '日线多头', value: 'daily' },
+              { label: '4h多头', value: 'h4' },
+              { label: '1h多头', value: 'h1' },
+              { label: '15m多头', value: 'm15' },
+            ]}
+          />
         </div>
 
         <div className={s.filterGroup}>
