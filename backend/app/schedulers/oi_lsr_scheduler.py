@@ -89,37 +89,47 @@ class OiLsrScheduler:
         now = datetime.now().replace(second=0, microsecond=0)
         sem = asyncio.Semaphore(10)
 
-        # Step 1: Extract OI from data_fetcher cache (no extra API calls)
+        # Step 1: Extract OI from arbitrage API (one request per exchange pair)
+        # Covers all chanceTypes including LPerp_SSpot for BTC/ETH etc.
         oi_data: dict[str, float] = {}
         try:
-            from app.services.data_fetcher import data_fetcher
-            cached = data_fetcher.get_cached_data()
-            for pair_key, pair_data in cached.items():
-                if not pair_data or not isinstance(pair_data, dict):
-                    continue
-                items = pair_data.get("data", pair_data)
-                if isinstance(items, dict):
-                    items = items.get("data", [])
-                if not isinstance(items, list):
-                    continue
-                for item in items:
-                    coin = item.get("coinName", "")
-                    if not coin:
+            from app.config import get_settings
+            api_url = get_settings().ARBITRAGE_API_URL.rstrip("/")
+            # Request BN as long exchange to get BN OI
+            pairs = [
+                (["BINANCE"], ["OKX"]),
+                (["BINANCE"], ["BYBIT"]),
+                (["BYBIT"], ["BINANCE"]),
+                (["OKX"], ["BINANCE"]),
+            ]
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
+                for long_exs, short_exs in pairs:
+                    try:
+                        async with session.post(
+                            f"{api_url}/crossapi/v1/arbitrage/chance/list",
+                            json={"acceptLongExchanges": long_exs,
+                                  "acceptShortExchanges": short_exs, "allData": True},
+                        ) as resp:
+                            if resp.status != 200:
+                                continue
+                            data = await resp.json()
+                        for item in data.get("data", []):
+                            coin = item.get("coinName", "")
+                            if not coin:
+                                continue
+                            symbol = coin + "USDT" if not coin.endswith("USDT") else coin
+                            oi_val = float(item.get("longOpenInterest", 0) or 0)
+                            # When BN is long exchange, longOpenInterest = BN OI
+                            if oi_val > 0:
+                                long_ex = item.get("longExchange", "")
+                                if long_ex == "BINANCE":
+                                    oi_data[symbol] = oi_val
+                                elif symbol not in oi_data:
+                                    oi_data[symbol] = oi_val
+                    except Exception:
                         continue
-                    symbol = coin + "USDT" if not coin.endswith("USDT") else coin
-                    # Extract OI — longOpenInterest is in USDT already
-                    long_ex = item.get("longExchange", "")
-                    short_ex = item.get("shortExchange", "")
-                    oi_val = float(item.get("longOpenInterest", 0) or 0)
-                    if oi_val > 0:
-                        # Use BN OI when BN is the long exchange
-                        if long_ex == "BINANCE" and symbol not in oi_data:
-                            oi_data[symbol] = oi_val
-                        # For any exchange pair, store if we don't have it yet
-                        elif symbol not in oi_data:
-                            oi_data[symbol] = oi_val
         except Exception as exc:
-            logger.error("OI extraction from cache failed: %s", exc)
+            logger.error("OI fetch from arbitrage API failed: %s", exc)
 
         # Step 2: Fetch LSR per symbol (Binance REST, different endpoint not affected by 418)
         lsr_data: dict[str, float] = {}
