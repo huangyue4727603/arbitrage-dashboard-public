@@ -47,6 +47,7 @@ export default function FundingRank() {
   const [coinOptions, setCoinOptions] = useState<{ label: string; value: string }[]>([]);
   const [indexOverlap, setIndexOverlap] = useState<Record<string, number>>({});
   const [bnIndexWeights, setBnIndexWeights] = useState<Record<string, { alpha?: number; future?: number }>>({});
+  const [bnSpotCoins, setBnSpotCoins] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fundingApi.getCoins().then((list) => {
@@ -70,6 +71,10 @@ export default function FundingRank() {
     fetchBnWeights();
     const timer = setInterval(fetchBnWeights, 300000); // 5min
     return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    fundingApi.getBnSpot().then((list) => setBnSpotCoins(new Set(list))).catch(() => {});
   }, []);
 
   const openCalculator = useCalculatorStore((s) => s.openCalculator);
@@ -157,6 +162,7 @@ export default function FundingRank() {
         index_overlap: indexOverlap[overlapKey],
         bn_alpha: bnIndexWeights[item.coin]?.alpha,
         bn_future: bnIndexWeights[item.coin]?.future,
+        bn_spot: bnSpotCoins.has(item.coin),
       };
     })
     .filter((item) => {

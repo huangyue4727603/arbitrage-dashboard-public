@@ -190,6 +190,24 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
           <span style={{ color: '#d9d9d9' }}>—</span>
         ),
     },
+    {
+      title: 'bn_spot',
+      dataIndex: 'bn_spot',
+      key: 'bn_spot',
+      width: 80,
+      align: 'center',
+      filters: [
+        { text: '有现货', value: true },
+        { text: '无现货', value: false },
+      ],
+      onFilter: (value, record) => (record.bn_spot ?? false) === value,
+      render: (val?: boolean) =>
+        val ? (
+          <span style={{ color: '#22AB94', fontSize: 16 }}>&#10003;</span>
+        ) : (
+          <span style={{ color: '#d9d9d9', fontSize: 14 }}>&#10007;</span>
+        ),
+    },
   ];
 
   return (

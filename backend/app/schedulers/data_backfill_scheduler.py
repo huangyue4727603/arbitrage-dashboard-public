@@ -20,7 +20,7 @@ from sqlalchemy import select, func
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 
 from app.database import async_session_factory
-from app.models.market_data import PriceKline, FundingHistory, FundingCap
+from app.models.market_data import PriceKline, FundingHistory, FundingCap, BnSpotSymbol
 from app.services.funding_rank import FundingRankService, BINANCE, OKX, BYBIT
 
 logger = logging.getLogger(__name__)
@@ -69,8 +69,10 @@ class DataBackfillScheduler:
         self._health_task: Optional[asyncio.Task] = None
         self._check_in_progress = False
         # Track WS health
-        self._last_ws_kline_time: float = 0.0  # last time WS wrote a kline
+        self._last_ws_kline_time: float = 0.0
         self._ws_healthy = True
+        # BN spot symbols — refresh once per day
+        self._bn_spot_last_refresh: float = 0.0
 
     def start_background(self) -> None:
         if self._running:
@@ -195,6 +197,7 @@ class DataBackfillScheduler:
             await self._backfill_klines(["1d", "4h"])
             await self._backfill_klines(["1h", "15m"])
             await self._backfill_klines(["5m"])
+            await self._refresh_bn_spot_symbols()
 
             elapsed = time.time() - t0
             logger.info("Data backfill check done in %.0f seconds", elapsed)
@@ -521,6 +524,55 @@ class DataBackfillScheduler:
         except Exception:
             pass
         return []
+
+    async def _refresh_bn_spot_symbols(self) -> None:
+        """Refresh Binance USDT spot trading pairs. Runs at most once per day."""
+        now = time.time()
+        if now - self._bn_spot_last_refresh < 86400:  # 24 hours
+            return
+
+        try:
+            from app.config import get_proxy
+            proxy = get_proxy() or None
+            timeout = aiohttp.ClientTimeout(total=15)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                # Binance spot API (not futures)
+                async with session.get("https://api.binance.com/api/v3/exchangeInfo",
+                                       proxy=proxy) as resp:
+                    if resp.status != 200:
+                        return
+                    info = await resp.json()
+
+            symbols = info.get("symbols", [])
+            spot_coins: list[dict[str, str]] = []
+            for s in symbols:
+                if (
+                    s.get("quoteAsset") == "USDT"
+                    and s.get("status") == "TRADING"
+                    and s.get("isSpotTradingAllowed", False)
+                ):
+                    coin = s.get("baseAsset", "")
+                    if coin:
+                        spot_coins.append({"coin": coin, "symbol": s["symbol"]})
+
+            if not spot_coins:
+                return
+
+            async with async_session_factory() as db:
+                for sc in spot_coins:
+                    stmt = mysql_insert(BnSpotSymbol).values(
+                        coin=sc["coin"], symbol=sc["symbol"]
+                    )
+                    stmt = stmt.on_duplicate_key_update(
+                        symbol=stmt.inserted.symbol
+                    )
+                    await db.execute(stmt)
+                await db.commit()
+
+            self._bn_spot_last_refresh = now
+            logger.info("BN spot symbols refreshed: %d coins", len(spot_coins))
+        except Exception as exc:
+            logger.error("BN spot symbols refresh failed: %s", exc, exc_info=True)
 
 
 # Singleton

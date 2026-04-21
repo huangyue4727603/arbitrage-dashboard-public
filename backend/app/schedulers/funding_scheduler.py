@@ -4,6 +4,8 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
+import aiohttp
+
 _UTC8 = timezone(timedelta(hours=8))
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -14,6 +16,8 @@ from sqlalchemy.dialects.mysql import insert as mysql_insert
 from app.database import async_session_factory
 from app.models.market_data import FundingHistory
 from app.services.funding_rank import FundingRankService, BINANCE, OKX, BYBIT
+
+BN_API = "https://fapi.binance.com"
 
 logger = logging.getLogger(__name__)
 
@@ -79,32 +83,81 @@ class FundingRankScheduler:
                 logger.info("Funding data gap detected: %.1f hours, fetching from %d hours ago",
                             gap_hours, fetch_ms / 3600000)
 
-        sem = asyncio.Semaphore(2)
+        sem = asyncio.Semaphore(5)
 
-        async def fetch_one(exchange: str, coin: str):
+        async def fetch_one_okx_by(exchange: str, coin: str):
+            """OKX/Bybit: use FundingRankService (no cooldown issue)."""
             async with sem:
                 try:
                     records = await self._service._fetch_funding_for_exchange(
                         exchange, coin, start_ms, now_ms
                     )
-                    await asyncio.sleep(0.3)  # Rate limit: 300ms between requests
+                    await asyncio.sleep(0.3)
                     return (exchange, coin, records) if records else None
                 except Exception:
                     return None
 
-        # Fetch per exchange sequentially to avoid overwhelming any single API
+        # Raw aiohttp session for Binance (bypasses BinanceClient cooldown)
+        bn_session: Optional[aiohttp.ClientSession] = None
+
+        async def fetch_one_bn(coin: str):
+            """Binance: raw aiohttp to bypass cooldown."""
+            nonlocal bn_session
+            async with sem:
+                try:
+                    symbol = coin + "USDT"
+                    params = {"symbol": symbol, "startTime": start_ms,
+                              "endTime": now_ms, "limit": 1000}
+                    assert bn_session is not None
+                    async with bn_session.get(
+                        f"{BN_API}/fapi/v1/fundingRate", params=params
+                    ) as resp:
+                        if resp.status in (418, 429):
+                            return None
+                        if resp.status != 200:
+                            return None
+                        raw_records = await resp.json()
+                    await asyncio.sleep(0.2)
+                    if not raw_records:
+                        return None
+                    parsed = [
+                        {"time_ms": int(r["fundingTime"]), "rate": float(r["fundingRate"])}
+                        for r in raw_records
+                    ]
+                    return (BINANCE, coin, parsed)
+                except Exception:
+                    return None
+
+        # Fetch per exchange
         fetch_results = []
+        timeout = aiohttp.ClientTimeout(total=15)
+
         for ex, coins_set in exchange_coins_map.items():
             coins_list = list(relevant & coins_set)
-            # Process in small batches with pauses
-            batch_size = 10
-            for i in range(0, len(coins_list), batch_size):
-                batch = coins_list[i:i + batch_size]
-                tasks = [fetch_one(ex, coin) for coin in batch]
-                results = await asyncio.gather(*tasks)
-                fetch_results.extend(results)
-                if i + batch_size < len(coins_list):
-                    await asyncio.sleep(1)  # 1s pause between batches
+            batch_size = 20
+
+            if ex == BINANCE:
+                # Use raw aiohttp for Binance
+                bn_session = aiohttp.ClientSession(timeout=timeout)
+                try:
+                    for i in range(0, len(coins_list), batch_size):
+                        batch = coins_list[i:i + batch_size]
+                        tasks = [fetch_one_bn(coin) for coin in batch]
+                        results = await asyncio.gather(*tasks)
+                        fetch_results.extend(results)
+                        if i + batch_size < len(coins_list):
+                            await asyncio.sleep(0.3)
+                finally:
+                    await bn_session.close()
+                    bn_session = None
+            else:
+                for i in range(0, len(coins_list), batch_size):
+                    batch = coins_list[i:i + batch_size]
+                    tasks = [fetch_one_okx_by(ex, coin) for coin in batch]
+                    results = await asyncio.gather(*tasks)
+                    fetch_results.extend(results)
+                    if i + batch_size < len(coins_list):
+                        await asyncio.sleep(0.5)
 
         # Batch upsert to DB
         async with async_session_factory() as db:

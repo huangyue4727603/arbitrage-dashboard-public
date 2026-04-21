@@ -207,6 +207,19 @@ async def get_bn_index_weights():
     return {"data": out}
 
 
+@router.get("/bn-spot")
+async def get_bn_spot():
+    """Return set of coins that have Binance USDT spot trading pairs."""
+    from sqlalchemy import select as sa_select
+    from app.database import async_session_factory
+    from app.models.market_data import BnSpotSymbol
+
+    async with async_session_factory() as db:
+        result = await db.execute(sa_select(BnSpotSymbol.coin))
+        coins = [row[0] for row in result.all()]
+    return {"data": coins}
+
+
 @router.get("/coins")
 async def get_coins():
     """Get list of all coins available in funding history."""

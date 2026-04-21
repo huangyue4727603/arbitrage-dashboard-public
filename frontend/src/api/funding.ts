@@ -22,6 +22,8 @@ export interface RankItem {
   // Binance index weights
   bn_alpha?: number;
   bn_future?: number;
+  // Binance spot availability
+  bn_spot?: boolean;
 }
 
 export interface RealtimeData {
@@ -118,6 +120,11 @@ export const fundingApi = {
 
   getBnIndexWeights: async (): Promise<Record<string, { alpha?: number; future?: number }>> => {
     const res = await client.get('/api/funding-rank/bn-index-weights');
+    return res.data.data;
+  },
+
+  getBnSpot: async (): Promise<string[]> => {
+    const res = await client.get('/api/funding-rank/bn-spot');
     return res.data.data;
   },
 

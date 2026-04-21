@@ -181,3 +181,20 @@ class MarketHistory(Base):
         Index("ix_market_history_inst_created", "inst_id", "created_at"),
         Index("ix_market_history_seq", "seq_id"),
     )
+
+
+class BnSpotSymbol(Base):
+    """Binance USDT spot trading pairs. Refreshed daily."""
+    __tablename__ = "arb_bn_spot_symbols"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    coin: Mapped[str] = mapped_column(String(50), nullable=False)
+    symbol: Mapped[str] = mapped_column(String(50), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False,
+        server_default=text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
+    )
+
+    __table_args__ = (
+        UniqueConstraint("coin", name="uq_bn_spot_coin"),
+    )
