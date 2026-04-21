@@ -41,9 +41,9 @@ class OISnapshotScheduler:
 
     async def _fetch_oi(self, session: aiohttp.ClientSession, symbol: str) -> Optional[float]:
         """Fetch current open interest from Binance."""
-        from app.services.exchange.binance import _cooldown_until
+        from app.services.exchange.binance import _cooldown_map
         import time as _time
-        if _time.time() < _cooldown_until:
+        if _time.time() < _cooldown_map.get("oi", 0.0):
             return None
         url = "https://fapi.binance.com/fapi/v1/openInterest"
         params = {"symbol": symbol}

@@ -50,10 +50,10 @@ def _norm(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 async def fetch_binance(coin: str) -> Optional[list[dict[str, Any]]]:
-    # Respect BinanceClient global cooldown to avoid 418 loops
-    from app.services.exchange.binance import _cooldown_until
+    # Respect BinanceClient per-group cooldown to avoid 418 loops
+    from app.services.exchange.binance import _cooldown_map
     import time
-    if time.time() < _cooldown_until:
+    if time.time() < _cooldown_map.get("constituents", 0.0):
         return None
 
     sym = f"{coin}USDT"
