@@ -15,7 +15,6 @@ import { authApi } from '../api/auth';
 import FundingRank from '../pages/FundingRank';
 import NewListing from '../pages/NewListing';
 import FundingBreak from '../pages/FundingBreak';
-import PriceTrend from '../pages/PriceTrend';
 import BasisMonitor from '../pages/BasisMonitor';
 import AlertConfig from '../pages/AlertConfig';
 import PremiumFilter from '../pages/PremiumFilter';
@@ -27,7 +26,6 @@ const tabItems = [
   { key: 'fundingRank', label: '资费排行', children: <FundingRank /> },
   { key: 'newListing', label: '新上线', children: <NewListing /> },
   { key: 'fundingBreak', label: '资费突破', children: <FundingBreak /> },
-  { key: 'priceTrend', label: '价格趋势', children: <PriceTrend /> },
   { key: 'premiumFilter', label: '大额基差', children: <PremiumFilter /> },
   { key: 'basisMonitor', label: '基差监控', children: <BasisMonitor /> },
   { key: 'alertConfig', label: '预警配置', children: <AlertConfig /> },
