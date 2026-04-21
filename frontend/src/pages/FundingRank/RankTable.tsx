@@ -6,12 +6,27 @@ interface RankTableProps {
   data: RankItem[];
   loading: boolean;
   onDiffClick: (record: RankItem) => void;
+  onWatchToggle?: (coin: string) => void;
 }
 
 const exLabel: Record<string, string> = { BN: 'BN', OKX: 'OKX', BY: 'BY' };
 
-export default function RankTable({ data, loading, onDiffClick }: RankTableProps) {
+export default function RankTable({ data, loading, onDiffClick, onWatchToggle }: RankTableProps) {
   const columns: ColumnsType<RankItem> = [
+    {
+      title: '',
+      key: 'watch',
+      width: 36,
+      fixed: 'left',
+      render: (_, r) => (
+        <span
+          onClick={(e) => { e.stopPropagation(); onWatchToggle?.(r.coin); }}
+          style={{ cursor: 'pointer', fontSize: 16, color: r.watched ? '#faad14' : '#e0e0e0' }}
+        >
+          {r.watched ? '★' : '☆'}
+        </span>
+      ),
+    },
     {
       title: '币种',
       dataIndex: 'coin',

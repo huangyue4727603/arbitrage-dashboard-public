@@ -5,6 +5,7 @@ import type { Dayjs } from 'dayjs';
 import { fundingApi, type RankItem, type RealtimeData } from '../../api/funding';
 import RankTable from './RankTable';
 import { useCalculatorStore } from '../../stores/calculatorStore';
+import { useAuthStore } from '../../stores/authStore';
 import s from './FundingRank.module.css';
 
 const { RangePicker } = DatePicker;
@@ -43,6 +44,8 @@ export default function FundingRank() {
   const [maxSpread, setMaxSpread] = useState<number | null>(null);
   const [minBasis, setMinBasis] = useState<number | null>(null);
   const [maxBasis, setMaxBasis] = useState<number | null>(null);
+  const [watchFilter, setWatchFilter] = useState<string>('');      // '' | 'yes' | 'no'
+  const [watchlist, setWatchlist] = useState<Set<string>>(new Set());
   const [bnSpotFilter, setBnSpotFilter] = useState<string>('');  // '' | 'yes' | 'no'
   const [trendFilter, setTrendFilter] = useState<string[]>([]);   // ['daily','h4','h1','m15']
   const [minLsr, setMinLsr] = useState<number | null>(null);
@@ -82,6 +85,22 @@ export default function FundingRank() {
   useEffect(() => {
     fundingApi.getBnSpot().then((list) => setBnSpotCoins(new Set(list))).catch(() => {});
   }, []);
+
+  // Watchlist — reload when auth changes
+  const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
+  const refreshWatchlist = useCallback(() => {
+    fundingApi.getWatchlist().then((list) => setWatchlist(new Set(list))).catch(() => {});
+  }, []);
+  useEffect(() => { refreshWatchlist(); }, [isLoggedIn, refreshWatchlist]);
+
+  const toggleWatch = useCallback(async (coin: string) => {
+    if (watchlist.has(coin)) {
+      await fundingApi.removeWatch(coin);
+    } else {
+      await fundingApi.addWatch(coin);
+    }
+    refreshWatchlist();
+  }, [watchlist, refreshWatchlist]);
 
   // Poll price trend every 5 minutes
   useEffect(() => {
@@ -186,6 +205,7 @@ export default function FundingRank() {
         index_overlap: indexOverlap[overlapKey],
         bn_alpha: bnIndexWeights[item.coin]?.alpha,
         bn_future: bnIndexWeights[item.coin]?.future,
+        watched: watchlist.has(item.coin),
         bn_spot: bnSpotCoins.has(item.coin),
         oi: oiLsr[item.coin]?.oi,
         lsr: oiLsr[item.coin]?.lsr,
@@ -205,6 +225,8 @@ export default function FundingRank() {
       if (maxSpread !== null && (item.current_spread ?? 0) > maxSpread) return false;
       if (minBasis !== null && (item.current_basis ?? 0) < minBasis) return false;
       if (maxBasis !== null && (item.current_basis ?? 0) > maxBasis) return false;
+      if (watchFilter === 'yes' && !item.watched) return false;
+      if (watchFilter === 'no' && item.watched) return false;
       if (bnSpotFilter === 'yes' && !item.bn_spot) return false;
       if (bnSpotFilter === 'no' && item.bn_spot) return false;
       if (trendFilter.length > 0) {
@@ -444,6 +466,12 @@ export default function FundingRank() {
         <div className={s.filterDivider} />
 
         <div className={s.filterGroup}>
+          <span className={s.filterLabel}>关注</span>
+          <Select value={watchFilter || undefined} onChange={(v) => setWatchFilter(v || '')} allowClear placeholder="全部" style={{ width: 90 }}
+            options={[{ label: '已关注', value: 'yes' }, { label: '未关注', value: 'no' }]} />
+        </div>
+
+        <div className={s.filterGroup}>
           <span className={s.filterLabel}>BN现货</span>
           <Select value={bnSpotFilter || undefined} onChange={(v) => setBnSpotFilter(v || '')} allowClear placeholder="全部" style={{ width: 90 }}
             options={[{ label: '有', value: 'yes' }, { label: '无', value: 'no' }]} />
@@ -482,6 +510,7 @@ export default function FundingRank() {
           data={filteredData}
           loading={loading}
           onDiffClick={handleDiffClick}
+          onWatchToggle={toggleWatch}
         />
       </div>
 

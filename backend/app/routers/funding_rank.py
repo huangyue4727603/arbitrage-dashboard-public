@@ -1,7 +1,7 @@
 import time
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.services.funding_rank import FundingRankService
@@ -9,6 +9,7 @@ from app.schedulers.funding_scheduler import funding_rank_scheduler
 from app.schedulers.kline_scheduler import kline_scheduler
 from app.services.data_fetcher import data_fetcher
 from app.schedulers.oi_lsr_scheduler import oi_lsr_scheduler
+from app.utils.auth import get_optional_user_id
 
 router = APIRouter(prefix="/api/funding-rank", tags=["funding-rank"])
 
@@ -238,6 +239,55 @@ async def get_bn_spot():
         result = await db.execute(sa_select(BnSpotSymbol.coin))
         coins = [row[0] for row in result.all()]
     return {"data": coins}
+
+
+@router.get("/watchlist")
+async def get_watchlist(user_id: Optional[int] = Depends(get_optional_user_id)):
+    """Get user's watched coins."""
+    if not user_id:
+        return {"data": []}
+    from sqlalchemy import select as sa_select
+    from app.database import async_session_factory
+    from app.models.market_data import UserWatchlist
+    async with async_session_factory() as db:
+        result = await db.execute(
+            sa_select(UserWatchlist.coin).where(UserWatchlist.user_id == user_id)
+        )
+        return {"data": [row[0] for row in result.all()]}
+
+
+@router.post("/watchlist/{coin}")
+async def add_watchlist(coin: str, user_id: Optional[int] = Depends(get_optional_user_id)):
+    """Add a coin to user's watchlist."""
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Login required")
+    from sqlalchemy.dialects.mysql import insert as mysql_insert
+    from app.database import async_session_factory
+    from app.models.market_data import UserWatchlist
+    async with async_session_factory() as db:
+        stmt = mysql_insert(UserWatchlist).values(user_id=user_id, coin=coin.upper())
+        stmt = stmt.on_duplicate_key_update(coin=stmt.inserted.coin)
+        await db.execute(stmt)
+        await db.commit()
+    return {"ok": True}
+
+
+@router.delete("/watchlist/{coin}")
+async def remove_watchlist(coin: str, user_id: Optional[int] = Depends(get_optional_user_id)):
+    """Remove a coin from user's watchlist."""
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Login required")
+    from sqlalchemy import delete as sa_delete
+    from app.database import async_session_factory
+    from app.models.market_data import UserWatchlist
+    async with async_session_factory() as db:
+        await db.execute(
+            sa_delete(UserWatchlist)
+            .where(UserWatchlist.user_id == user_id)
+            .where(UserWatchlist.coin == coin.upper())
+        )
+        await db.commit()
+    return {"ok": True}
 
 
 @router.get("/coins")

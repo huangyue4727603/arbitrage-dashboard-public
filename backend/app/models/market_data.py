@@ -213,6 +213,20 @@ class LsrSnapshot5m(Base):
     )
 
 
+class UserWatchlist(Base):
+    """Per-user coin watchlist for funding rank."""
+    __tablename__ = "arb_user_watchlist"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    coin: Mapped[str] = mapped_column(String(50), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "coin", name="uq_user_watchlist"),
+        Index("ix_user_watchlist_user", "user_id"),
+    )
+
+
 class BnSpotSymbol(Base):
     """Binance USDT spot trading pairs. Refreshed daily."""
     __tablename__ = "arb_bn_spot_symbols"

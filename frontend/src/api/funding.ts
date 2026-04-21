@@ -27,6 +27,8 @@ export interface RankItem {
   // OI & LSR
   oi?: number;   // open interest in USDT
   lsr?: number;  // long/short ratio
+  // Watchlist
+  watched?: boolean;
   // Price trend (MA bullish alignment)
   trend_daily?: boolean;
   trend_h4?: boolean;
@@ -144,6 +146,19 @@ export const fundingApi = {
   getOiLsr: async (): Promise<Record<string, { oi?: number; lsr?: number }>> => {
     const res = await client.get('/api/funding-rank/oi-lsr');
     return res.data.data;
+  },
+
+  getWatchlist: async (): Promise<string[]> => {
+    const res = await client.get('/api/funding-rank/watchlist');
+    return res.data.data;
+  },
+
+  addWatch: async (coin: string): Promise<void> => {
+    await client.post(`/api/funding-rank/watchlist/${coin}`);
+  },
+
+  removeWatch: async (coin: string): Promise<void> => {
+    await client.delete(`/api/funding-rank/watchlist/${coin}`);
   },
 
   getBnSpot: async (): Promise<string[]> => {
