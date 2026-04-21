@@ -34,6 +34,19 @@ SKIP_PATHS = {
     "/api/settings/notification",
     "/api/settings/theme",
     "/api/funding-rank/action-log",
+    "/api/funding-rank",
+    "/api/funding-rank/watchlist",
+    "/api/funding-rank/coins",
+    "/api/alert/basis",
+    "/api/alert/basis/history",
+    "/api/alert/lark-bots",
+    "/api/alert/post-investment",
+    "/api/alert/post-investment/available-coins",
+    "/api/alert/funding-break/config",
+    "/api/alert/funding-break/alerts",
+    "/api/alert/new-listing/config",
+    "/api/alert/new-listing/alerts",
+    "/api/alert/unhedged",
 }
 
 
@@ -45,8 +58,10 @@ class ActionLogMiddleware(BaseHTTPMiddleware):
         if not path.startswith("/api"):
             return await call_next(request)
 
-        # Skip auto-refresh polling endpoints (only log user-initiated actions)
-        if path in SKIP_PATHS:
+        # Skip auto-refresh polling and GET requests (auto-refresh)
+        # Only log POST/PUT/DELETE (user write actions)
+        # Frontend sort/filter/page actions are logged via /action-log endpoint
+        if request.method == "GET" or path in SKIP_PATHS:
             return await call_next(request)
 
 
