@@ -109,6 +109,42 @@ class FundingRankService:
                         coin = _coin_from_bybit_symbol(inst.get("symbol", ""))
                         if coin:
                             coins.add(coin)
+
+        # DB fallback: if API returns empty (e.g. IP banned), read from DB
+        if not coins:
+            coins = await self._get_exchange_coins_from_db(exchange)
+            if coins:
+                logger.info("_get_exchange_coins(%s): API empty, using DB fallback (%d coins)",
+                            exchange, len(coins))
+        return coins
+
+    async def _get_exchange_coins_from_db(self, exchange: str) -> set[str]:
+        """Fallback: get coin list from funding_caps + funding_history tables."""
+        exchange_cap_map = {BINANCE: "Binance", OKX: "OKX", BYBIT: "Bybit"}
+        cap_name = exchange_cap_map.get(exchange, exchange)
+        coins: set[str] = set()
+        try:
+            async with async_session_factory() as db:
+                # From funding_caps
+                from app.models.market_data import FundingCap
+                result = await db.execute(
+                    select(FundingCap.symbol).where(FundingCap.exchange == cap_name)
+                )
+                for row in result.all():
+                    sym = row[0]
+                    if sym.endswith("USDT"):
+                        coins.add(sym[:-4])
+                    elif "-" in sym:
+                        coins.add(sym.split("-")[0])
+
+                # Also from funding_history (catches coins not in caps)
+                result2 = await db.execute(
+                    select(FundingHistory.coin).where(FundingHistory.exchange == exchange).distinct()
+                )
+                for row in result2.all():
+                    coins.add(row[0])
+        except Exception as exc:
+            logger.error("DB fallback for %s coins failed: %s", exchange, exc)
         return coins
 
     # ── API fetch methods (used by scheduler for data ingestion) ──
