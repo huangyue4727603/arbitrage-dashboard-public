@@ -27,7 +27,7 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
     {
       title: '做多总资费',
       key: 'long_funding_ex',
-      width: 120,
+      width: 105,
       render: (_, r) => (
         <span style={{ color: r.long_total_funding >= 0 ? '#22AB94' : '#F23645' }}>
           {r.long_total_funding >= 0 ? '+' : ''}{r.long_total_funding.toFixed(2)}%
@@ -38,7 +38,7 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
     {
       title: '做空总资费',
       key: 'short_funding_ex',
-      width: 120,
+      width: 105,
       sorter: (a, b) => a.short_total_funding - b.short_total_funding,
       render: (_, r) => (
         <span style={{ color: r.short_total_funding >= 0 ? '#22AB94' : '#F23645' }}>
