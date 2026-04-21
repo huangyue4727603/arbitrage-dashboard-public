@@ -192,12 +192,12 @@ class DataBackfillScheduler:
         t0 = time.time()
 
         try:
+            await self._refresh_bn_spot_symbols()
             await self._backfill_funding([OKX, BYBIT])
             await self._backfill_funding([BINANCE])
             await self._backfill_klines(["1d", "4h"])
             await self._backfill_klines(["1h", "15m"])
             await self._backfill_klines(["5m"])
-            await self._refresh_bn_spot_symbols()
 
             elapsed = time.time() - t0
             logger.info("Data backfill check done in %.0f seconds", elapsed)
