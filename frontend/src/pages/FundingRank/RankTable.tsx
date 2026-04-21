@@ -191,6 +191,36 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
         ),
     },
     {
+      title: '持仓量',
+      dataIndex: 'oi',
+      key: 'oi',
+      width: 100,
+      align: 'right',
+      sorter: (a, b) => (a.oi ?? 0) - (b.oi ?? 0),
+      render: (val?: number) =>
+        val ? (
+          <span>{(val / 1e6).toFixed(3)}m</span>
+        ) : (
+          <span style={{ color: '#d9d9d9' }}>—</span>
+        ),
+    },
+    {
+      title: '多空比',
+      dataIndex: 'lsr',
+      key: 'lsr',
+      width: 90,
+      align: 'right',
+      sorter: (a, b) => (a.lsr ?? 0) - (b.lsr ?? 0),
+      render: (val?: number) =>
+        val ? (
+          <span style={{ color: val < 1 ? '#22AB94' : undefined }}>
+            {val.toFixed(3)}
+          </span>
+        ) : (
+          <span style={{ color: '#d9d9d9' }}>—</span>
+        ),
+    },
+    {
       title: 'bn_spot',
       dataIndex: 'bn_spot',
       key: 'bn_spot',

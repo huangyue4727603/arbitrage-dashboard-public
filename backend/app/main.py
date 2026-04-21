@@ -28,6 +28,7 @@ from app.schedulers.basis_alert_scheduler import basis_alert_scheduler
 from app.schedulers.index_constituents_scheduler import index_constituents_scheduler
 from app.schedulers.market_history_scheduler import market_history_scheduler
 from app.schedulers.data_backfill_scheduler import data_backfill_scheduler
+from app.schedulers.oi_lsr_scheduler import oi_lsr_scheduler
 
 # Import all models so they are registered with Base.metadata
 import app.models  # noqa: F401
@@ -66,6 +67,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     cleanup_scheduler.start()
     index_constituents_scheduler.start()
     market_history_scheduler.start()
+    oi_lsr_scheduler.start()
     # Start background data backfill (runs once, fills gaps across all data types)
     data_backfill_scheduler.start_background()
     # Preload caches so first page load isn't empty
@@ -74,6 +76,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     _asyncio.create_task(kline_scheduler.refresh_funding_cumulative())
     yield
     data_backfill_scheduler.stop()
+    oi_lsr_scheduler.stop()
     market_history_scheduler.stop()
     index_constituents_scheduler.stop()
     cleanup_scheduler.stop()

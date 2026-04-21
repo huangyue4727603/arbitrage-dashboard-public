@@ -183,6 +183,36 @@ class MarketHistory(Base):
     )
 
 
+class OiSnapshot5m(Base):
+    """Binance USDT perpetual open interest snapshots (5-minute interval)."""
+    __tablename__ = "arb_oi_5m"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    symbol: Mapped[str] = mapped_column(String(50), nullable=False)
+    oi_usdt: Mapped[float] = mapped_column(Float, nullable=False)  # OI in USDT
+    snapshot_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("symbol", "snapshot_time", name="uq_oi_5m_symbol_time"),
+        Index("ix_oi_5m_time", "snapshot_time"),
+    )
+
+
+class LsrSnapshot5m(Base):
+    """Binance global long/short account ratio snapshots (5-minute interval)."""
+    __tablename__ = "arb_lsr_5m"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    symbol: Mapped[str] = mapped_column(String(50), nullable=False)
+    long_short_ratio: Mapped[float] = mapped_column(Float, nullable=False)
+    snapshot_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("symbol", "snapshot_time", name="uq_lsr_5m_symbol_time"),
+        Index("ix_lsr_5m_time", "snapshot_time"),
+    )
+
+
 class BnSpotSymbol(Base):
     """Binance USDT spot trading pairs. Refreshed daily."""
     __tablename__ = "arb_bn_spot_symbols"

@@ -48,6 +48,7 @@ export default function FundingRank() {
   const [indexOverlap, setIndexOverlap] = useState<Record<string, number>>({});
   const [bnIndexWeights, setBnIndexWeights] = useState<Record<string, { alpha?: number; future?: number }>>({});
   const [bnSpotCoins, setBnSpotCoins] = useState<Set<string>>(new Set());
+  const [oiLsr, setOiLsr] = useState<Record<string, { oi?: number; lsr?: number }>>({});
 
   useEffect(() => {
     fundingApi.getCoins().then((list) => {
@@ -75,6 +76,16 @@ export default function FundingRank() {
 
   useEffect(() => {
     fundingApi.getBnSpot().then((list) => setBnSpotCoins(new Set(list))).catch(() => {});
+  }, []);
+
+  // Poll OI/LSR every 5 minutes
+  useEffect(() => {
+    const fetchOiLsr = () => {
+      fundingApi.getOiLsr().then(setOiLsr).catch(() => {});
+    };
+    fetchOiLsr();
+    const timer = setInterval(fetchOiLsr, 300000);
+    return () => clearInterval(timer);
   }, []);
 
   const openCalculator = useCalculatorStore((s) => s.openCalculator);
@@ -163,6 +174,8 @@ export default function FundingRank() {
         bn_alpha: bnIndexWeights[item.coin]?.alpha,
         bn_future: bnIndexWeights[item.coin]?.future,
         bn_spot: bnSpotCoins.has(item.coin),
+        oi: oiLsr[item.coin]?.oi,
+        lsr: oiLsr[item.coin]?.lsr,
       };
     })
     .filter((item) => {

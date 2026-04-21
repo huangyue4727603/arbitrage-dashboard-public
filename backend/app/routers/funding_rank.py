@@ -8,6 +8,7 @@ from app.services.funding_rank import FundingRankService
 from app.schedulers.funding_scheduler import funding_rank_scheduler
 from app.schedulers.kline_scheduler import kline_scheduler
 from app.services.data_fetcher import data_fetcher
+from app.schedulers.oi_lsr_scheduler import oi_lsr_scheduler
 
 router = APIRouter(prefix="/api/funding-rank", tags=["funding-rank"])
 
@@ -205,6 +206,25 @@ async def get_bn_index_weights():
             elif spot_ex == "binance_future":
                 out[coin]["future"] = round(float(weight or 0), 4)
     return {"data": out}
+
+
+@router.get("/oi-lsr")
+async def get_oi_lsr():
+    """Return latest OI (USDT) and Long/Short Ratio per symbol."""
+    oi = oi_lsr_scheduler.get_latest_oi()
+    lsr = oi_lsr_scheduler.get_latest_lsr()
+    # Merge into {coin: {oi, lsr}}
+    result: dict[str, dict] = {}
+    for symbol, val in oi.items():
+        coin = symbol[:-4] if symbol.endswith("USDT") else symbol
+        result[coin] = {"oi": val}
+    for symbol, val in lsr.items():
+        coin = symbol[:-4] if symbol.endswith("USDT") else symbol
+        if coin in result:
+            result[coin]["lsr"] = val
+        else:
+            result[coin] = {"lsr": val}
+    return {"data": result}
 
 
 @router.get("/bn-spot")

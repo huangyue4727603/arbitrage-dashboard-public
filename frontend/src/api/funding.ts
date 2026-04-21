@@ -24,6 +24,9 @@ export interface RankItem {
   bn_future?: number;
   // Binance spot availability
   bn_spot?: boolean;
+  // OI & LSR
+  oi?: number;   // open interest in USDT
+  lsr?: number;  // long/short ratio
 }
 
 export interface RealtimeData {
@@ -120,6 +123,11 @@ export const fundingApi = {
 
   getBnIndexWeights: async (): Promise<Record<string, { alpha?: number; future?: number }>> => {
     const res = await client.get('/api/funding-rank/bn-index-weights');
+    return res.data.data;
+  },
+
+  getOiLsr: async (): Promise<Record<string, { oi?: number; lsr?: number }>> => {
+    const res = await client.get('/api/funding-rank/oi-lsr');
     return res.data.data;
   },
 
