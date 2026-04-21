@@ -163,32 +163,6 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
         ),
     },
     {
-      title: 'bn_alpha',
-      dataIndex: 'bn_alpha',
-      key: 'bn_alpha',
-      width: 80,
-      sorter: (a, b) => (a.bn_alpha ?? 0) - (b.bn_alpha ?? 0),
-      render: (val?: number) =>
-        val ? (
-          <span style={{ color: '#E6A700' }}>{(val * 100).toFixed(1)}%</span>
-        ) : (
-          <span style={{ color: '#d9d9d9' }}>—</span>
-        ),
-    },
-    {
-      title: 'bn_future',
-      dataIndex: 'bn_future',
-      key: 'bn_future',
-      width: 80,
-      sorter: (a, b) => (a.bn_future ?? 0) - (b.bn_future ?? 0),
-      render: (val?: number) =>
-        val ? (
-          <span style={{ color: '#E6A700' }}>{(val * 100).toFixed(1)}%</span>
-        ) : (
-          <span style={{ color: '#d9d9d9' }}>—</span>
-        ),
-    },
-    {
       title: '持仓量',
       dataIndex: 'oi',
       key: 'oi',
@@ -231,6 +205,32 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
           <span style={{ color: '#22AB94', fontSize: 16 }}>&#10003;</span>
         ) : (
           <span style={{ color: '#d9d9d9', fontSize: 14 }}>&#10007;</span>
+        ),
+    },
+    {
+      title: 'bn_alpha',
+      dataIndex: 'bn_alpha',
+      key: 'bn_alpha',
+      width: 80,
+      sorter: (a, b) => (a.bn_alpha ?? 0) - (b.bn_alpha ?? 0),
+      render: (val?: number) =>
+        val ? (
+          <span style={{ color: '#E6A700' }}>{(val * 100).toFixed(1)}%</span>
+        ) : (
+          <span style={{ color: '#d9d9d9' }}>—</span>
+        ),
+    },
+    {
+      title: 'bn_future',
+      dataIndex: 'bn_future',
+      key: 'bn_future',
+      width: 80,
+      sorter: (a, b) => (a.bn_future ?? 0) - (b.bn_future ?? 0),
+      render: (val?: number) =>
+        val ? (
+          <span style={{ color: '#E6A700' }}>{(val * 100).toFixed(1)}%</span>
+        ) : (
+          <span style={{ color: '#d9d9d9' }}>—</span>
         ),
     },
   ];
