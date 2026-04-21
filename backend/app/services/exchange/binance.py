@@ -8,9 +8,33 @@ from app.config import get_proxy
 
 logger = logging.getLogger(__name__)
 
-# Global 418 cooldown: all BinanceClient instances share this
-_cooldown_until: float = 0.0
-_COOLDOWN_SECONDS = 300  # 5 minutes cooldown after 418
+# Per-path cooldown: different endpoints get independent cooldowns
+# so that e.g. /constituents getting 418 doesn't block /fundingRate
+_cooldown_map: dict[str, float] = {}  # path -> cooldown_until timestamp
+_COOLDOWN_SECONDS = 300  # 5 minutes default cooldown after 418
+
+
+def _get_cooldown_group(path: str) -> str:
+    """Map an API path to its cooldown group.
+
+    Endpoints in the same group share a cooldown timer.
+    Critical data endpoints are isolated from non-critical ones.
+    """
+    if "/fundingRate" in path:
+        return "funding"
+    if "/klines" in path:
+        return "klines"
+    if "/fundingInfo" in path:
+        return "fundingInfo"
+    if "/exchangeInfo" in path:
+        return "exchangeInfo"
+    if "/constituents" in path:
+        return "constituents"
+    if "/ticker" in path or "/premiumIndex" in path:
+        return "ticker"
+    if "/openInterest" in path:
+        return "oi"
+    return "other"
 
 
 class BinanceClient:
@@ -56,14 +80,19 @@ class BinanceClient:
         Returns an empty list or dict (matching the expected return type of
         the caller) on any network / HTTP error so that upstream code does
         not need to handle exceptions from the exchange layer.
-        """
-        global _cooldown_until
 
-        # Check global cooldown
+        Uses per-endpoint-group cooldowns so that e.g. /constituents getting
+        418 does NOT block /fundingRate requests.
+        """
+        group = _get_cooldown_group(path)
+
+        # Check per-group cooldown
         now = time.time()
-        if now < _cooldown_until:
-            remaining = int(_cooldown_until - now)
-            logger.debug("Binance cooldown active (%ds remaining), skipping %s %s", remaining, method, path)
+        cooldown_until = _cooldown_map.get(group, 0.0)
+        if now < cooldown_until:
+            remaining = int(cooldown_until - now)
+            logger.debug("Binance [%s] cooldown active (%ds remaining), skipping %s %s",
+                         group, remaining, method, path)
             return None
 
         session = await self._get_session()
@@ -82,25 +111,25 @@ class BinanceClient:
                         # Parse "banned until <timestamp_ms>"
                         if "banned until" in msg:
                             ban_ts = int(msg.split("banned until")[1].split(".")[0].strip())
-                            _cooldown_until = ban_ts / 1000
-                            wait_sec = int(_cooldown_until - time.time())
+                            _cooldown_map[group] = ban_ts / 1000
+                            wait_sec = int(_cooldown_map[group] - time.time())
                             logger.warning(
-                                "Binance %s %s: IP banned until %s (%d seconds)",
-                                method, path,
-                                time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(_cooldown_until)),
+                                "Binance [%s] %s %s: IP banned until %s (%d seconds)",
+                                group, method, path,
+                                time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(_cooldown_map[group])),
                                 max(wait_sec, 0),
                             )
                         else:
-                            _cooldown_until = time.time() + _COOLDOWN_SECONDS
+                            _cooldown_map[group] = time.time() + _COOLDOWN_SECONDS
                             logger.warning(
-                                "Binance %s %s: status %d, cooldown %ds",
-                                method, path, resp.status, _COOLDOWN_SECONDS
+                                "Binance [%s] %s %s: status %d, cooldown %ds",
+                                group, method, path, resp.status, _COOLDOWN_SECONDS
                             )
                     except Exception:
-                        _cooldown_until = time.time() + _COOLDOWN_SECONDS
+                        _cooldown_map[group] = time.time() + _COOLDOWN_SECONDS
                         logger.warning(
-                            "Binance %s %s: status %d, cooldown %ds",
-                            method, path, resp.status, _COOLDOWN_SECONDS
+                            "Binance [%s] %s %s: status %d, cooldown %ds",
+                            group, method, path, resp.status, _COOLDOWN_SECONDS
                         )
                     raise aiohttp.ClientResponseError(
                         resp.request_info, resp.history,
