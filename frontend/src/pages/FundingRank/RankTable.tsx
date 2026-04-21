@@ -72,7 +72,7 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
       defaultSortOrder: 'descend',
       render: (val: number, record: RankItem) => (
         <span onClick={() => onDiffClick(record)} style={{ color: val >= 0 ? '#22AB94' : '#F23645', cursor: 'pointer' }}>
-          {val >= 0 ? '+' : ''}{val.toFixed(3)}%
+          {val >= 0 ? '+' : ''}{val.toFixed(2)}%
         </span>
       ),
     },
@@ -106,7 +106,7 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
       sorter: (a, b) => (a.current_spread ?? 0) - (b.current_spread ?? 0),
       render: (val?: number) =>
         val !== undefined
-          ? <span style={{ color: val >= 0 ? '#22AB94' : '#F23645' }}>{val >= 0 ? '+' : ''}{val.toFixed(4)}%</span>
+          ? <span style={{ color: val >= 0 ? '#22AB94' : '#F23645' }}>{val >= 0 ? '+' : ''}{val.toFixed(2)}%</span>
           : <span style={{ color: '#d9d9d9' }}>-</span>,
     },
     {
@@ -117,7 +117,7 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
       sorter: (a, b) => (a.current_basis ?? 0) - (b.current_basis ?? 0),
       render: (val?: number) =>
         val !== undefined
-          ? <span style={{ color: val >= 0 ? '#22AB94' : '#F23645' }}>{val >= 0 ? '+' : ''}{val.toFixed(4)}%</span>
+          ? <span style={{ color: val >= 0 ? '#22AB94' : '#F23645' }}>{val >= 0 ? '+' : ''}{val.toFixed(2)}%</span>
           : <span style={{ color: '#d9d9d9' }}>-</span>,
     },
     {
@@ -127,7 +127,7 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
       width: 82,
       sorter: (a, b) => (a.oi ?? 0) - (b.oi ?? 0),
       render: (val?: number) =>
-        val ? <span>{(val / 1e6).toFixed(3)}m</span> : <span style={{ color: '#d9d9d9' }}>—</span>,
+        val ? <span>{(val / 1e6).toFixed(2)}m</span> : <span style={{ color: '#d9d9d9' }}>—</span>,
     },
     {
       title: '多空比',
@@ -137,7 +137,7 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
       sorter: (a, b) => (a.lsr ?? 0) - (b.lsr ?? 0),
       render: (val?: number) =>
         val
-          ? <span style={{ color: val < 1 ? '#22AB94' : undefined }}>{val.toFixed(3)}</span>
+          ? <span style={{ color: val < 1 ? '#22AB94' : undefined }}>{val.toFixed(2)}</span>
           : <span style={{ color: '#d9d9d9' }}>—</span>,
     },
     {
