@@ -377,6 +377,7 @@ export default function FundingRank() {
 
       {/* ===== Filter Bar ===== */}
       <div className={s.filterBar}>
+        {/* Row 1: 时间 + 币种 + 交易所 + 关注 */}
         <div className={s.filterGroup}>
           <span className={s.filterLabel}>时间</span>
           <RangePicker
@@ -395,118 +396,58 @@ export default function FundingRank() {
             ]}
           />
         </div>
-
-        <div className={s.filterDivider} />
-
         <div className={s.filterGroup}>
           <span className={s.filterLabel}>币种</span>
-          <Select
-            showSearch
-            allowClear
-            value={coinFilter || undefined}
-            onChange={(v) => setCoinFilter(v || '')}
-            options={coinOptions}
-            placeholder="搜索"
-            style={{ width: 120 }}
-            filterOption={(input, option) =>
-              (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-            }
-          />
+          <Select showSearch allowClear value={coinFilter || undefined} onChange={(v) => setCoinFilter(v || '')} options={coinOptions} placeholder="搜索" style={{ width: 100 }} filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())} />
         </div>
-
         <div className={s.filterGroup}>
           <span className={s.filterLabel}>做多</span>
-          <Select value={longExchange} onChange={setLongExchange} options={exchangeOptions} style={{ width: 140 }} />
+          <Select value={longExchange} onChange={setLongExchange} options={exchangeOptions} style={{ width: 110 }} />
         </div>
-
         <div className={s.filterGroup}>
           <span className={s.filterLabel}>做空</span>
-          <Select value={shortExchange} onChange={setShortExchange} options={exchangeOptions} style={{ width: 140 }} />
+          <Select value={shortExchange} onChange={setShortExchange} options={exchangeOptions} style={{ width: 110 }} />
         </div>
-
-        <div className={s.filterDivider} />
-
-        <div className={s.filterGroup}>
-          <span className={s.filterLabel}>多周期</span>
-          <Select
-            mode="multiple"
-            value={longPeriods}
-            onChange={setLongPeriods}
-            options={periodOptions}
-            placeholder="全部"
-            allowClear
-            style={{ minWidth: 110, maxWidth: 180 }}
-          />
-        </div>
-
-        <div className={s.filterGroup}>
-          <span className={s.filterLabel}>空周期</span>
-          <Select
-            mode="multiple"
-            value={shortPeriods}
-            onChange={setShortPeriods}
-            options={periodOptions}
-            placeholder="全部"
-            allowClear
-            style={{ minWidth: 110, maxWidth: 180 }}
-          />
-        </div>
-
-        <div className={s.filterDivider} />
-
-        <div className={s.filterGroup}>
-          <span className={s.filterLabel}>开差</span>
-          <InputNumber value={minSpread} onChange={(v) => setMinSpread(v)} placeholder="最小" style={{ width: 72 }} />
-          <span style={{ color: 'var(--text-3)' }}>–</span>
-          <InputNumber value={maxSpread} onChange={(v) => setMaxSpread(v)} placeholder="最大" style={{ width: 72 }} />
-        </div>
-
-        <div className={s.filterGroup}>
-          <span className={s.filterLabel}>基差</span>
-          <InputNumber value={minBasis} onChange={(v) => setMinBasis(v)} placeholder="最小" style={{ width: 72 }} />
-          <span style={{ color: 'var(--text-3)' }}>–</span>
-          <InputNumber value={maxBasis} onChange={(v) => setMaxBasis(v)} placeholder="最大" style={{ width: 72 }} />
-        </div>
-
-        <div className={s.filterDivider} />
-
         <div className={s.filterGroup}>
           <span className={s.filterLabel}>关注</span>
-          <Select value={watchFilter || undefined} onChange={(v) => setWatchFilter(v || '')} allowClear placeholder="全部" style={{ width: 90 }}
-            options={[{ label: '已关注', value: 'yes' }, { label: '未关注', value: 'no' }]} />
+          <Select value={watchFilter || undefined} onChange={(v) => setWatchFilter(v || '')} allowClear placeholder="全部" style={{ width: 85 }} options={[{ label: '已关注', value: 'yes' }, { label: '未关注', value: 'no' }]} />
         </div>
-
         <div className={s.filterGroup}>
           <span className={s.filterLabel}>BN现货</span>
-          <Select value={bnSpotFilter || undefined} onChange={(v) => setBnSpotFilter(v || '')} allowClear placeholder="全部" style={{ width: 90 }}
-            options={[{ label: '有', value: 'yes' }, { label: '无', value: 'no' }]} />
+          <Select value={bnSpotFilter || undefined} onChange={(v) => setBnSpotFilter(v || '')} allowClear placeholder="全部" style={{ width: 75 }} options={[{ label: '有', value: 'yes' }, { label: '无', value: 'no' }]} />
         </div>
 
+        {/* Row 2: 周期 + 数值范围 + 趋势 */}
         <div className={s.filterGroup}>
-          <span className={s.filterLabel}>价格趋势</span>
-          <Select
-            mode="multiple"
-            value={trendFilter}
-            onChange={setTrendFilter}
-            allowClear
-            placeholder="全部"
-            style={{ minWidth: 100, maxWidth: 220 }}
-            options={[
-              { label: '日线多头', value: 'daily' },
-              { label: '4h多头', value: 'h4' },
-              { label: '1h多头', value: 'h1' },
-              { label: '15m多头', value: 'm15' },
-            ]}
-          />
+          <span className={s.filterLabel}>多周期</span>
+          <Select mode="multiple" value={longPeriods} onChange={setLongPeriods} options={periodOptions} placeholder="全部" allowClear style={{ minWidth: 90, maxWidth: 160 }} />
         </div>
-
+        <div className={s.filterGroup}>
+          <span className={s.filterLabel}>空周期</span>
+          <Select mode="multiple" value={shortPeriods} onChange={setShortPeriods} options={periodOptions} placeholder="全部" allowClear style={{ minWidth: 90, maxWidth: 160 }} />
+        </div>
+        <div className={s.filterGroup}>
+          <span className={s.filterLabel}>开差</span>
+          <InputNumber value={minSpread} onChange={(v) => setMinSpread(v)} placeholder="min" style={{ width: 62 }} />
+          <span style={{ color: 'var(--text-3)', margin: '0 2px' }}>–</span>
+          <InputNumber value={maxSpread} onChange={(v) => setMaxSpread(v)} placeholder="max" style={{ width: 62 }} />
+        </div>
+        <div className={s.filterGroup}>
+          <span className={s.filterLabel}>基差</span>
+          <InputNumber value={minBasis} onChange={(v) => setMinBasis(v)} placeholder="min" style={{ width: 62 }} />
+          <span style={{ color: 'var(--text-3)', margin: '0 2px' }}>–</span>
+          <InputNumber value={maxBasis} onChange={(v) => setMaxBasis(v)} placeholder="max" style={{ width: 62 }} />
+        </div>
         <div className={s.filterGroup}>
           <span className={s.filterLabel}>多空比</span>
-          <InputNumber value={minLsr} onChange={(v) => setMinLsr(v)} placeholder="最小" style={{ width: 72 }} />
-          <span style={{ color: 'var(--text-3)' }}>–</span>
-          <InputNumber value={maxLsr} onChange={(v) => setMaxLsr(v)} placeholder="最大" style={{ width: 72 }} />
+          <InputNumber value={minLsr} onChange={(v) => setMinLsr(v)} placeholder="min" style={{ width: 62 }} />
+          <span style={{ color: 'var(--text-3)', margin: '0 2px' }}>–</span>
+          <InputNumber value={maxLsr} onChange={(v) => setMaxLsr(v)} placeholder="max" style={{ width: 62 }} />
         </div>
-
+        <div className={s.filterGroup}>
+          <span className={s.filterLabel}>趋势</span>
+          <Select mode="multiple" value={trendFilter} onChange={setTrendFilter} allowClear placeholder="全部" style={{ minWidth: 90, maxWidth: 200 }} options={[{ label: '日线', value: 'daily' }, { label: '4H', value: 'h4' }, { label: '1H', value: 'h1' }, { label: '15m', value: 'm15' }]} />
+        </div>
       </div>
 
       {/* ===== Table ===== */}
