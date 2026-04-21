@@ -81,7 +81,7 @@ export default function RankTable({ data, loading, onDiffClick, onWatchToggle }:
       title: '资费差额',
       dataIndex: 'total_diff',
       key: 'total_diff',
-      width: 75,
+      width: 68,
       sorter: (a, b) => a.total_diff - b.total_diff,
       defaultSortOrder: 'descend',
       render: (val: number, record: RankItem) => (
@@ -93,7 +93,7 @@ export default function RankTable({ data, loading, onDiffClick, onWatchToggle }:
     {
       title: '做多结算',
       key: 'long_count_period',
-      width: 75,
+      width: 68,
       render: (_, r) => (
         <span>{r.long_settlement_count}次<span style={{ color: '#999' }}>/{r.long_settlement_period}h</span></span>
       ),
@@ -101,7 +101,7 @@ export default function RankTable({ data, loading, onDiffClick, onWatchToggle }:
     {
       title: '做空结算',
       key: 'short_count_period',
-      width: 75,
+      width: 68,
       render: (_, r) => (
         <span>{r.short_settlement_count}次<span style={{ color: '#999' }}>/{r.short_settlement_period}h</span></span>
       ),
@@ -200,10 +200,28 @@ export default function RankTable({ data, loading, onDiffClick, onWatchToggle }:
       ),
     },
     {
+      title: '共同指数',
+      dataIndex: 'index_overlap',
+      key: 'index_overlap',
+      width: 70,
+      sorter: (a, b) => (a.index_overlap ?? 0) - (b.index_overlap ?? 0),
+      render: (val: number | undefined, record: RankItem) => {
+        const pct = val ?? 0;
+        return (
+          <span
+            onClick={(e) => { e.stopPropagation(); showIndexDetail(record); }}
+            style={{ color: pct < 0.4 ? '#F23645' : undefined, cursor: 'pointer' }}
+          >
+            {(pct * 100).toFixed(1)}%
+          </span>
+        );
+      },
+    },
+    {
       title: 'bn_alpha',
       dataIndex: 'bn_alpha',
       key: 'bn_alpha',
-      width: 75,
+      width: 70,
       sorter: (a, b) => (a.bn_alpha ?? 0) - (b.bn_alpha ?? 0),
       render: (val?: number) =>
         val ? <span style={{ color: '#E6A700' }}>{(val * 100).toFixed(1)}%</span> : <span style={{ color: '#d9d9d9' }}>—</span>,
@@ -212,29 +230,10 @@ export default function RankTable({ data, loading, onDiffClick, onWatchToggle }:
       title: 'bn_future',
       dataIndex: 'bn_future',
       key: 'bn_future',
-      width: 75,
+      width: 70,
       sorter: (a, b) => (a.bn_future ?? 0) - (b.bn_future ?? 0),
       render: (val?: number) =>
         val ? <span style={{ color: '#E6A700' }}>{(val * 100).toFixed(1)}%</span> : <span style={{ color: '#d9d9d9' }}>—</span>,
-    },
-    {
-      title: '共同指数',
-      dataIndex: 'index_overlap',
-      key: 'index_overlap',
-      width: 80,
-      sorter: (a, b) => (a.index_overlap ?? 0) - (b.index_overlap ?? 0),
-      render: (val: number | undefined, record: RankItem) => {
-        const pct = val ?? 0;
-        const color = pct < 0.4 ? '#F23645' : undefined;
-        return (
-          <span
-            onClick={(e) => { e.stopPropagation(); showIndexDetail(record); }}
-            style={{ color, cursor: 'pointer', textDecoration: 'underline' }}
-          >
-            {(pct * 100).toFixed(1)}%
-          </span>
-        );
-      },
     },
   ];
 
