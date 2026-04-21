@@ -12,9 +12,9 @@ const { RangePicker } = DatePicker;
 
 const exchangeOptions = [
   { label: '全部', value: '' },
-  { label: 'Binance (BN)', value: 'BN' },
+  { label: 'BN', value: 'BN' },
   { label: 'OKX', value: 'OKX' },
-  { label: 'Bybit (BY)', value: 'BY' },
+  { label: 'BY', value: 'BY' },
 ];
 
 const periodOptions = [
