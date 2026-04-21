@@ -194,26 +194,28 @@ class KlineScheduler:
             except Exception as exc:
                 logger.error("Failed to compute 24h changes: %s", exc)
 
-            # --- 3d: from DB 1d klines ---
+            # --- 3d: current price from 5m kline, 72h-ago price from 1d kline ---
             try:
                 now = datetime.now()
                 t_3d = now - timedelta(hours=72)
 
                 async with async_session_factory() as db:
-                    # Current price: latest 1d kline close
-                    latest_subq = (
-                        select(PriceKline.symbol, func.max(PriceKline.kline_time).label("max_time"))
-                        .where(PriceKline.interval_type == "1d")
-                        .group_by(PriceKline.symbol)
-                        .subquery()
-                    )
-                    latest_result = await db.execute(
-                        select(PriceKline.symbol, PriceKline.close_price)
-                        .join(latest_subq, (PriceKline.symbol == latest_subq.c.symbol) &
-                              (PriceKline.kline_time == latest_subq.c.max_time))
-                        .where(PriceKline.interval_type == "1d")
-                    )
-                    latest_prices = {row[0]: row[1] for row in latest_result.all()}
+                    # Current price: latest 5m kline close (most up-to-date)
+                    # Reuse latest_prices from 24h calc above if available
+                    if not latest_prices:
+                        latest_5m_subq = (
+                            select(PriceKline.symbol, func.max(PriceKline.kline_time).label("mt"))
+                            .where(PriceKline.interval_type == "5m")
+                            .group_by(PriceKline.symbol)
+                            .subquery()
+                        )
+                        latest_5m_res = await db.execute(
+                            select(PriceKline.symbol, PriceKline.close_price)
+                            .join(latest_5m_subq, (PriceKline.symbol == latest_5m_subq.c.symbol) &
+                                  (PriceKline.kline_time == latest_5m_subq.c.mt))
+                            .where(PriceKline.interval_type == "5m")
+                        )
+                        latest_prices = {row[0]: row[1] for row in latest_5m_res.all()}
 
                     # 72h ago: 1d kline (±1 day window)
                     lo = t_3d - timedelta(days=1)
