@@ -45,7 +45,7 @@ def _to_int(v: Any) -> Optional[int]:
 async def fetch_histories(ts_ms: int) -> list[dict]:
     """GET /api/v1/arbitrage/chance/histories?ts=...&exchangeEnums=BINANCE,OKX,BYBIT"""
     base = get_settings().ARBITRAGE_API_URL.rstrip("/")
-    url = f"{base}/api/v1/arbitrage/chance/histories"
+    url = f"{base}/crossapi/v1/arbitrage/chance/histories"
     params = {"ts": ts_ms, "exchangeEnums": "BINANCE,OKX,BYBIT"}
     timeout = aiohttp.ClientTimeout(total=600, sock_connect=30, sock_read=300)
     # trust_env=False — arbitrage API is direct (same as data_fetcher)

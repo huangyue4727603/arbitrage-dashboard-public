@@ -50,6 +50,12 @@ def _norm(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 async def fetch_binance(coin: str) -> Optional[list[dict[str, Any]]]:
+    # Respect BinanceClient global cooldown to avoid 418 loops
+    from app.services.exchange.binance import _cooldown_until
+    import time
+    if time.time() < _cooldown_until:
+        return None
+
     sym = f"{coin}USDT"
     try:
         data = await _http_get_json(

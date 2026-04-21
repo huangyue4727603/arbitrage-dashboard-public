@@ -1,4 +1,5 @@
 import logging
+import time
 from typing import Any, Optional, Union
 
 import aiohttp
@@ -6,6 +7,10 @@ import aiohttp
 from app.config import get_proxy
 
 logger = logging.getLogger(__name__)
+
+# Global 418 cooldown: all BinanceClient instances share this
+_cooldown_until: float = 0.0
+_COOLDOWN_SECONDS = 300  # 5 minutes cooldown after 418
 
 
 class BinanceClient:
@@ -52,6 +57,15 @@ class BinanceClient:
         the caller) on any network / HTTP error so that upstream code does
         not need to handle exceptions from the exchange layer.
         """
+        global _cooldown_until
+
+        # Check global cooldown
+        now = time.time()
+        if now < _cooldown_until:
+            remaining = int(_cooldown_until - now)
+            logger.debug("Binance cooldown active (%ds remaining), skipping %s %s", remaining, method, path)
+            return None
+
         session = await self._get_session()
         url = f"{self.base_url}{path}"
         req_timeout = aiohttp.ClientTimeout(total=timeout) if timeout else None
@@ -60,8 +74,45 @@ class BinanceClient:
             async with session.request(
                 method, url, params=params, timeout=req_timeout, proxy=proxy
             ) as resp:
+                if resp.status in (418, 429):
+                    # Try to parse ban expiry from Binance response
+                    try:
+                        body = await resp.json()
+                        msg = body.get("msg", "")
+                        # Parse "banned until <timestamp_ms>"
+                        if "banned until" in msg:
+                            ban_ts = int(msg.split("banned until")[1].split(".")[0].strip())
+                            _cooldown_until = ban_ts / 1000
+                            wait_sec = int(_cooldown_until - time.time())
+                            logger.warning(
+                                "Binance %s %s: IP banned until %s (%d seconds)",
+                                method, path,
+                                time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(_cooldown_until)),
+                                max(wait_sec, 0),
+                            )
+                        else:
+                            _cooldown_until = time.time() + _COOLDOWN_SECONDS
+                            logger.warning(
+                                "Binance %s %s: status %d, cooldown %ds",
+                                method, path, resp.status, _COOLDOWN_SECONDS
+                            )
+                    except Exception:
+                        _cooldown_until = time.time() + _COOLDOWN_SECONDS
+                        logger.warning(
+                            "Binance %s %s: status %d, cooldown %ds",
+                            method, path, resp.status, _COOLDOWN_SECONDS
+                        )
+                    raise aiohttp.ClientResponseError(
+                        resp.request_info, resp.history,
+                        status=resp.status, message=f"Rate limited ({resp.status})"
+                    )
                 resp.raise_for_status()
                 return await resp.json()
+        except aiohttp.ClientResponseError as exc:
+            if exc.status in (418, 429):
+                raise  # Let caller handle rate limits
+            logger.error("Binance request %s %s failed: %s", method, path, exc)
+            return None
         except Exception as exc:
             logger.error("Binance request %s %s failed: %s", method, path, exc)
             return None

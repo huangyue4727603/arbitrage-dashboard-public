@@ -89,7 +89,7 @@ async def _fetch_upstream(ts: int, threshold: float) -> List[str]:
         timeout = aiohttp.ClientTimeout(total=30, sock_read=15)
         async with aiohttp.ClientSession(timeout=timeout, trust_env=False) as session:
             async with session.get(
-                f"{SELF_API_URL}/api/v1/arbitrage/chance/premium_filter",
+                f"{SELF_API_URL}/crossapi/v1/arbitrage/chance/premium_filter",
                 params={"ts": ts, "premiumThreshold": threshold},
             ) as resp:
                 resp.raise_for_status()

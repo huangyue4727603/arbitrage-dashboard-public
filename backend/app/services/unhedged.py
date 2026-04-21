@@ -145,6 +145,10 @@ class UnhedgedService:
 
     async def _fetch_price_change_5m(self, coin: str) -> float:
         """Fetch 5-minute price change from Binance kline API."""
+        from app.services.exchange.binance import _cooldown_until
+        import time as _time
+        if _time.time() < _cooldown_until:
+            return 0.0
         symbol = coin.upper() + "USDT"
         url = "https://fapi.binance.com/fapi/v1/klines"
         params = {

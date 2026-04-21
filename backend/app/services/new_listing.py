@@ -10,6 +10,8 @@ from sqlalchemy.dialects.mysql import insert as mysql_insert
 from app.database import async_session_factory
 from app.models.market_data import NewListing
 from app.services.exchange import BinanceClient, OKXClient, BybitClient
+from app.services.okx_kline_ws import okx_kline_ws
+from app.services.bybit_kline_ws import bybit_kline_ws
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +20,19 @@ NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000
 
 
 class NewListingService:
-    """Service for detecting and tracking newly listed coins on exchanges."""
+    """Service for detecting and tracking newly listed coins on exchanges.
+
+    Maintains a per-exchange set of symbols confirmed to be older than 90 days.
+    These are skipped on subsequent refreshes to avoid unnecessary API calls.
+    """
+
+    def __init__(self) -> None:
+        # Symbols confirmed >90 days old — never need kline check again
+        self._old_symbols: dict[str, set[str]] = {
+            "BINANCE": set(),
+            "OKX": set(),
+            "BYBIT": set(),
+        }
 
     async def get_new_listings(self, exchange: str) -> list[dict[str, Any]]:
         """
@@ -101,6 +115,7 @@ class NewListingService:
         results: list[dict[str, Any]] = []
         now_ms = int(time.time() * 1000)
         ninety_days_ago_ms = now_ms - NINETY_DAYS_MS
+        old_symbols = self._old_symbols["BINANCE"]
 
         async with BinanceClient() as client:
             # Get all USDT perpetual symbols
@@ -113,6 +128,13 @@ class NewListingService:
                 and s.get("quoteAsset") == "USDT"
                 and s.get("status") == "TRADING"
             ]
+
+            # Skip symbols already confirmed >90 days
+            symbols_to_check = [s for s in usdt_perp_symbols if s not in old_symbols]
+            skipped = len(usdt_perp_symbols) - len(symbols_to_check)
+            if skipped > 0:
+                logger.info("Binance new listing: skipping %d known old symbols, checking %d",
+                            skipped, len(symbols_to_check))
 
             # Get current funding rates for all symbols in one batch call
             all_tickers = await client.get_24hr_ticker()
@@ -140,6 +162,8 @@ class NewListingService:
                             limit=91,
                         )
                         if not klines or len(klines) >= 90:
+                            # Confirmed old symbol — cache it
+                            old_symbols.add(symbol)
                             return None
 
                         # It's a new listing
@@ -198,7 +222,7 @@ class NewListingService:
                         logger.warning("Binance check %s failed: %s", symbol, exc)
                         return None
 
-            tasks = [check_symbol(s) for s in usdt_perp_symbols]
+            tasks = [check_symbol(s) for s in symbols_to_check]
             check_results = await asyncio.gather(*tasks)
             for r in check_results:
                 if r is not None:
@@ -216,6 +240,7 @@ class NewListingService:
         results: list[dict[str, Any]] = []
         now_ms = int(time.time() * 1000)
         ninety_days_ago_ms = now_ms - NINETY_DAYS_MS
+        old_symbols = self._old_symbols["OKX"]
 
         async with OKXClient() as client:
             # Get all USDT swap tickers (this gives us the list of instruments)
@@ -229,7 +254,20 @@ class NewListingService:
             for t in usdt_swap_tickers:
                 ticker_map[t.get("instId", "")] = t
 
-            inst_ids = [t["instId"] for t in usdt_swap_tickers]
+            all_inst_ids = [t["instId"] for t in usdt_swap_tickers]
+
+            # Also mark symbols with enough WS kline data as old
+            ws_cached = okx_kline_ws.get_cached_symbols()
+            for iid in all_inst_ids:
+                if iid not in old_symbols and okx_kline_ws.get_kline_count(iid) >= 90:
+                    old_symbols.add(iid)
+
+            # Skip symbols already confirmed >90 days
+            inst_ids = [iid for iid in all_inst_ids if iid not in old_symbols]
+            skipped = len(all_inst_ids) - len(inst_ids)
+            if skipped > 0:
+                logger.info("OKX new listing: skipping %d known old symbols, checking %d",
+                            skipped, len(inst_ids))
 
             semaphore = asyncio.Semaphore(3)
 
@@ -251,6 +289,8 @@ class NewListingService:
                         # Check if the oldest candle is within 90 days
                         oldest_ts = int(klines_sorted[0][0])
                         if oldest_ts < ninety_days_ago_ms:
+                            # Confirmed old symbol — cache it
+                            old_symbols.add(inst_id)
                             return None
                         first_kline = klines_sorted[0]
                         first_day_close = float(first_kline[4])  # close price at index 4
@@ -316,6 +356,7 @@ class NewListingService:
         results: list[dict[str, Any]] = []
         now_ms = int(time.time() * 1000)
         ninety_days_ago_ms = now_ms - NINETY_DAYS_MS
+        old_symbols = self._old_symbols["BYBIT"]
 
         async with BybitClient() as client:
             # Get all linear USDT perpetual instruments
@@ -334,7 +375,19 @@ class NewListingService:
             for t in all_tickers:
                 ticker_map[t.get("symbol", "")] = t
 
-            symbols = [inst["symbol"] for inst in usdt_perps]
+            all_symbols = [inst["symbol"] for inst in usdt_perps]
+
+            # Also mark symbols with enough WS kline data as old
+            for s in all_symbols:
+                if s not in old_symbols and bybit_kline_ws.get_kline_count(s) >= 90:
+                    old_symbols.add(s)
+
+            # Skip symbols already confirmed >90 days
+            symbols = [s for s in all_symbols if s not in old_symbols]
+            skipped = len(all_symbols) - len(symbols)
+            if skipped > 0:
+                logger.info("Bybit new listing: skipping %d known old symbols, checking %d",
+                            skipped, len(symbols))
 
             semaphore = asyncio.Semaphore(3)
 
@@ -349,6 +402,8 @@ class NewListingService:
                             limit=91,
                         )
                         if not klines or len(klines) >= 90:
+                            # Confirmed old symbol — cache it
+                            old_symbols.add(symbol)
                             return None
 
                         # Bybit klines are returned newest first, sort chronologically

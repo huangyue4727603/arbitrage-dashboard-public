@@ -88,7 +88,7 @@ class DataFetcher:
 
         try:
             async with session.post(
-                f"{self.base_url}/api/v1/arbitrage/chance/list",
+                f"{self.base_url}/crossapi/v1/arbitrage/chance/list",
                 json=payload,
             ) as resp:
                 resp.raise_for_status()

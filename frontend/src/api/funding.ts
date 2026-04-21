@@ -19,6 +19,9 @@ export interface RankItem {
   change_3d?: number;
   // Index constituent overlap (0..1) for this (coin, long, short) combo
   index_overlap?: number;
+  // Binance index weights
+  bn_alpha?: number;
+  bn_future?: number;
 }
 
 export interface RealtimeData {
@@ -110,6 +113,11 @@ export const fundingApi = {
 
   getIndexOverlap: async (): Promise<Record<string, number>> => {
     const res = await client.get('/api/funding-rank/index-overlap');
+    return res.data.data;
+  },
+
+  getBnIndexWeights: async (): Promise<Record<string, { alpha?: number; future?: number }>> => {
+    const res = await client.get('/api/funding-rank/bn-index-weights');
     return res.data.data;
   },
 

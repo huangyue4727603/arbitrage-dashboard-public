@@ -161,7 +161,7 @@
   font-size: 11px !important;
   font-weight: 600 !important;
   letter-spacing: 0.6px;
-  text-transform: uppercase;
+  text-transform: none;
   padding: 12px 14px !important;
   border-bottom: 1px solid var(--border) !important;
 }

@@ -70,7 +70,7 @@ class BasisAlertScheduler:
 
     def _fetch_sync(self) -> List[Dict[str, Any]]:
         """Synchronous fetch using requests lib (~2-3s, same as user's script)."""
-        api_url = f"{settings.ARBITRAGE_API_URL}/api/v1/arbitrage/chance/list"
+        api_url = f"{settings.ARBITRAGE_API_URL}/crossapi/v1/arbitrage/chance/list"
         all_items: List[Dict[str, Any]] = []
         seen_coins: Dict[str, Dict] = {}
 

@@ -83,7 +83,7 @@
   font-size: var(--fs-11);
   font-weight: 600;
   letter-spacing: 1.5px;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--text-3);
 }
 .title {
@@ -132,7 +132,7 @@
   font-size: var(--fs-11);
   font-weight: 600;
   letter-spacing: 1px;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--text-3);
   display: flex;
   align-items: center;
@@ -310,7 +310,7 @@
   font-size: 11px !important;
   font-weight: 600 !important;
   letter-spacing: 0.6px;
-  text-transform: uppercase;
+  text-transform: none;
   padding: 12px 14px !important;
   border-bottom: 1px solid var(--border) !important;
 }

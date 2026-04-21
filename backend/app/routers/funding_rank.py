@@ -179,6 +179,34 @@ async def get_index_overlap():
     return {"data": out}
 
 
+@router.get("/bn-index-weights")
+async def get_bn_index_weights():
+    """Return binance_alpha and binance_future weights per coin from BN index constituents.
+
+    Response: {"RAVE": {"alpha": 0.1333, "future": 0.2}, "SIREN": {"alpha": 0.5, "future": 0.125}, ...}
+    """
+    from sqlalchemy import text
+    from app.database import async_session_factory
+
+    sql = text("""
+        SELECT coin, spot_exchange, weight
+        FROM arb_index_constituents
+        WHERE exchange = 'BN'
+          AND spot_exchange IN ('binance_alpha', 'binance_future')
+    """)
+    out: dict = {}
+    async with async_session_factory() as db:
+        r = await db.execute(sql)
+        for coin, spot_ex, weight in r.all():
+            if coin not in out:
+                out[coin] = {}
+            if spot_ex == "binance_alpha":
+                out[coin]["alpha"] = round(float(weight or 0), 4)
+            elif spot_ex == "binance_future":
+                out[coin]["future"] = round(float(weight or 0), 4)
+    return {"data": out}
+
+
 @router.get("/coins")
 async def get_coins():
     """Get list of all coins available in funding history."""

@@ -29,8 +29,8 @@ logger = logging.getLogger(__name__)
 
 # Per-tick: fetch BATCH coins in parallel, then sleep BATCH_SLEEP_SEC.
 # Throughput = BATCH / BATCH_SLEEP_SEC coins/sec per worker.
-BATCH = 20
-BATCH_SLEEP_SEC = 2       # 20 coins per 2s per worker → 10 coins/s (OKX limit ~10/s)
+BATCH = 5
+BATCH_SLEEP_SEC = 10      # 5 coins per 10s per worker → 0.5 coins/s (avoid Binance rate limit)
 SLOW_SLEEP_SEC = 15       # Bybit Playwright (per coin, single-threaded)
 
 # How often to refresh the in-memory coin list from DB
@@ -151,13 +151,20 @@ class IndexConstituentsScheduler:
 
                 results = await asyncio.gather(*(fetcher(c) for c in batch), return_exceptions=True)
                 ok = 0
+                rate_limited = False
                 for c, r in zip(batch, results):
                     if isinstance(r, list) and r:
                         await self._upsert(c, exchange, r)
                         ok += 1
+                    elif isinstance(r, Exception) and "418" in str(r):
+                        rate_limited = True
                 logger.info("[%s] batch=%d ok=%d", exchange, len(batch), ok)
 
-                await asyncio.sleep(BATCH_SLEEP_SEC)
+                if rate_limited or (ok == 0 and len(batch) > 2):
+                    logger.warning("[%s] Rate limited or all failed, pausing 5 minutes", exchange)
+                    await asyncio.sleep(300)
+                else:
+                    await asyncio.sleep(BATCH_SLEEP_SEC)
             except asyncio.CancelledError:
                 break
             except Exception as exc:

@@ -93,13 +93,13 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
       sorter: (a, b) => a.total_diff - b.total_diff,
       defaultSortOrder: 'descend',
       render: (val: number, record: RankItem) => (
-        <a
+        <span
           onClick={() => onDiffClick(record)}
           style={{ color: val >= 0 ? '#22AB94' : '#F23645', cursor: 'pointer' }}
         >
           {val >= 0 ? '+' : ''}
           {val.toFixed(3)}%
-        </a>
+        </span>
       ),
     },
     {
@@ -162,6 +162,32 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
           </span>
         ) : (
           '-'
+        ),
+    },
+    {
+      title: 'bn_alpha',
+      dataIndex: 'bn_alpha',
+      key: 'bn_alpha',
+      width: 95,
+      sorter: (a, b) => (a.bn_alpha ?? 0) - (b.bn_alpha ?? 0),
+      render: (val?: number) =>
+        val ? (
+          <span style={{ color: '#E6A700' }}>{(val * 100).toFixed(1)}%</span>
+        ) : (
+          <span style={{ color: '#d9d9d9' }}>—</span>
+        ),
+    },
+    {
+      title: 'bn_future',
+      dataIndex: 'bn_future',
+      key: 'bn_future',
+      width: 95,
+      sorter: (a, b) => (a.bn_future ?? 0) - (b.bn_future ?? 0),
+      render: (val?: number) =>
+        val ? (
+          <span style={{ color: '#E6A700' }}>{(val * 100).toFixed(1)}%</span>
+        ) : (
+          <span style={{ color: '#d9d9d9' }}>—</span>
         ),
     },
   ];

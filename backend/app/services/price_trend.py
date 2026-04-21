@@ -37,7 +37,7 @@ class PriceTrendService:
         symbols: List[str] = []
         for s in info.get("symbols", []):
             if (
-                s.get("contractType") == "PERPETUAL"
+                s.get("contractType") in ("PERPETUAL", "TRADIFI_PERPETUAL")
                 and s.get("quoteAsset") == "USDT"
                 and s.get("status") == "TRADING"
             ):
