@@ -212,14 +212,12 @@ class IndexConstituentsScheduler:
         self._stopped = False
         loop = asyncio.get_event_loop()
         import os
-        enable_bybit = os.environ.get("ENABLE_BYBIT_CONSTITUENTS", "0") == "1"
         self._tasks = [
             loop.create_task(self._exchange_loop("BN", fetch_binance), name="idx_const_bn"),
             loop.create_task(self._exchange_loop("OKX", fetch_okx), name="idx_const_okx"),
+            loop.create_task(self._exchange_loop("BY", fetch_bybit), name="idx_const_by"),
             loop.create_task(self._new_coin_detector_loop(), name="idx_const_detect"),
         ]
-        if enable_bybit:
-            self._tasks.append(loop.create_task(self._exchange_loop("BY", fetch_bybit), name="idx_const_by"))
         logger.info(
             "index_constituents_scheduler started (batch=%d/%ds per worker, slow=%ds)",
             BATCH, BATCH_SLEEP_SEC, SLOW_SLEEP_SEC,
