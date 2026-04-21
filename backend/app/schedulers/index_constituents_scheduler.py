@@ -219,7 +219,7 @@ class IndexConstituentsScheduler:
             loop.create_task(self._new_coin_detector_loop(), name="idx_const_detect"),
         ]
         if enable_bybit:
-            self._tasks.append(loop.create_task(self._slow_loop(), name="idx_const_slow"))
+            self._tasks.append(loop.create_task(self._exchange_loop("BY", fetch_bybit), name="idx_const_by"))
         logger.info(
             "index_constituents_scheduler started (batch=%d/%ds per worker, slow=%ds)",
             BATCH, BATCH_SLEEP_SEC, SLOW_SLEEP_SEC,

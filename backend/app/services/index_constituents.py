@@ -113,15 +113,32 @@ async def fetch_okx(coin: str) -> Optional[list[dict[str, Any]]]:
 
 
 async def fetch_bybit(coin: str) -> Optional[list[dict[str, Any]]]:
-    """Bybit has no public API for constituents.
-    Use Playwright headless to render the announcement detail page.
+    """Bybit V5 API: /v5/market/index-price-components?indexName=<symbol>USDT"""
+    sym = f"{coin}USDT"
+    try:
+        data = await _http_get_json(
+            "https://api.bybit.com/v5/market/index-price-components",
+            params={"indexName": sym},
+        )
+        if not isinstance(data, dict) or data.get("retCode") != 0:
+            return None
+        result = data.get("result", {})
+        comps = result.get("components") or []
+        normalized = [
+            {"exch": c_.get("exchange"), "symbol": c_.get("spotPair", ""), "weight": c_.get("weight")}
+            for c_ in comps
+        ]
+        return _norm(normalized)
+    except Exception as exc:
+        logger.warning("bybit constituents %s failed: %s", coin, exc)
+        return None
 
-    Lazy import: only loads if Playwright is installed (deploy-time only).
-    """
+
+async def _fetch_bybit_old(coin: str) -> Optional[list[dict[str, Any]]]:
+    """Legacy Playwright-based scraper (kept for reference, not used)."""
     try:
         from playwright.async_api import async_playwright  # type: ignore
     except ImportError:
-        logger.error("playwright not installed; skip bybit constituents")
         return None
 
     url = f"https://www.bybit.com/zh-MY/announcement-info/index-price/?symbol={coin}USDT"
@@ -131,8 +148,6 @@ async def fetch_bybit(coin: str) -> Optional[list[dict[str, Any]]]:
             ctx = await browser.new_context(user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36")
             page = await ctx.new_page()
             await page.goto(url, wait_until="networkidle", timeout=30000)
-            # Bybit page structure may vary; try common selectors. Tune after first run.
-            # Look for table rows containing exchange + weight columns.
             rows = await page.query_selector_all("table tbody tr")
             data: list[dict[str, Any]] = []
             for r in rows:
