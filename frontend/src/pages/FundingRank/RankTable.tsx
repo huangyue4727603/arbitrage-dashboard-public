@@ -92,7 +92,7 @@ export default function RankTable({ data, loading, onDiffClick, onWatchToggle }:
       ),
     },
     {
-      title: '1d',
+      title: '1d涨幅',
       dataIndex: 'change_1d',
       key: 'change_1d',
       width: 70,
@@ -103,7 +103,7 @@ export default function RankTable({ data, loading, onDiffClick, onWatchToggle }:
           : <span style={{ color: '#d9d9d9' }}>—</span>,
     },
     {
-      title: '3d',
+      title: '3d涨幅',
       dataIndex: 'change_3d',
       key: 'change_3d',
       width: 70,
