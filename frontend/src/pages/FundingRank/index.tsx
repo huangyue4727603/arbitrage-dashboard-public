@@ -43,6 +43,10 @@ export default function FundingRank() {
   const [maxSpread, setMaxSpread] = useState<number | null>(null);
   const [minBasis, setMinBasis] = useState<number | null>(null);
   const [maxBasis, setMaxBasis] = useState<number | null>(null);
+  const [bnSpotFilter, setBnSpotFilter] = useState<string>('');  // '' | 'yes' | 'no'
+  const [trendFilter, setTrendFilter] = useState<string>('');     // '' | 'bullish' | 'none'
+  const [minLsr, setMinLsr] = useState<number | null>(null);
+  const [maxLsr, setMaxLsr] = useState<number | null>(null);
   const [coinFilter, setCoinFilter] = useState<string>('');
   const [coinOptions, setCoinOptions] = useState<{ label: string; value: string }[]>([]);
   const [indexOverlap, setIndexOverlap] = useState<Record<string, number>>({});
@@ -201,6 +205,12 @@ export default function FundingRank() {
       if (maxSpread !== null && (item.current_spread ?? 0) > maxSpread) return false;
       if (minBasis !== null && (item.current_basis ?? 0) < minBasis) return false;
       if (maxBasis !== null && (item.current_basis ?? 0) > maxBasis) return false;
+      if (bnSpotFilter === 'yes' && !item.bn_spot) return false;
+      if (bnSpotFilter === 'no' && item.bn_spot) return false;
+      if (trendFilter === 'bullish' && !(item.trend_daily || item.trend_h4 || item.trend_h1 || item.trend_m15)) return false;
+      if (trendFilter === 'none' && (item.trend_daily || item.trend_h4 || item.trend_h1 || item.trend_m15)) return false;
+      if (minLsr !== null && (item.lsr ?? 999) < minLsr) return false;
+      if (maxLsr !== null && (item.lsr ?? 0) > maxLsr) return false;
       return true;
     });
 
@@ -423,6 +433,27 @@ export default function FundingRank() {
           <InputNumber value={minBasis} onChange={(v) => setMinBasis(v)} placeholder="最小" style={{ width: 72 }} />
           <span style={{ color: 'var(--text-3)' }}>–</span>
           <InputNumber value={maxBasis} onChange={(v) => setMaxBasis(v)} placeholder="最大" style={{ width: 72 }} />
+        </div>
+
+        <div className={s.filterDivider} />
+
+        <div className={s.filterGroup}>
+          <span className={s.filterLabel}>BN现货</span>
+          <Select value={bnSpotFilter || undefined} onChange={(v) => setBnSpotFilter(v || '')} allowClear placeholder="全部" style={{ width: 90 }}
+            options={[{ label: '有', value: 'yes' }, { label: '无', value: 'no' }]} />
+        </div>
+
+        <div className={s.filterGroup}>
+          <span className={s.filterLabel}>价格趋势</span>
+          <Select value={trendFilter || undefined} onChange={(v) => setTrendFilter(v || '')} allowClear placeholder="全部" style={{ width: 100 }}
+            options={[{ label: '有多头', value: 'bullish' }, { label: '无多头', value: 'none' }]} />
+        </div>
+
+        <div className={s.filterGroup}>
+          <span className={s.filterLabel}>多空比</span>
+          <InputNumber value={minLsr} onChange={(v) => setMinLsr(v)} placeholder="最小" style={{ width: 72 }} />
+          <span style={{ color: 'var(--text-3)' }}>–</span>
+          <InputNumber value={maxLsr} onChange={(v) => setMaxLsr(v)} placeholder="最大" style={{ width: 72 }} />
         </div>
 
       </div>

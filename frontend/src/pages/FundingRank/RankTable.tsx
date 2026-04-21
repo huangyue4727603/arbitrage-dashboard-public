@@ -145,11 +145,6 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
       dataIndex: 'bn_spot',
       key: 'bn_spot',
       width: 65,
-      filters: [
-        { text: '有现货', value: true },
-        { text: '无现货', value: false },
-      ],
-      onFilter: (value, record) => (record.bn_spot ?? false) === value,
       render: (val?: boolean) =>
         val
           ? <span style={{ color: '#22AB94', fontSize: 15 }}>&#10003;</span>
@@ -159,6 +154,10 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
       title: '价格趋势',
       key: 'trend',
       width: 85,
+      sorter: (a, b) => {
+        const score = (r: RankItem) => (r.trend_daily ? 8 : 0) + (r.trend_h4 ? 4 : 0) + (r.trend_h1 ? 2 : 0) + (r.trend_m15 ? 1 : 0);
+        return score(a) - score(b);
+      },
       render: (_, record) => (
         <span style={{ display: 'flex', gap: 3 }} title="日线 4H 1H 15m">
           {[record.trend_daily, record.trend_h4, record.trend_h1, record.trend_m15].map((v, i) => (
