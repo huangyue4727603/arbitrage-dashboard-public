@@ -229,6 +229,20 @@ class UserWatchlist(Base):
     )
 
 
+class SpotExchangeMapping(Base):
+    """Mapping table to normalize spot_exchange names in index constituents."""
+    __tablename__ = "arb_spot_exchange_mapping"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    raw_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    normalized_name: Mapped[str] = mapped_column(String(100), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("raw_name", name="uq_spot_exchange_raw"),
+        Index("ix_spot_exchange_normalized", "normalized_name"),
+    )
+
+
 class BnSpotSymbol(Base):
     """Binance USDT spot trading pairs. Refreshed daily."""
     __tablename__ = "arb_bn_spot_symbols"
