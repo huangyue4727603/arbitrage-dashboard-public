@@ -1,17 +1,14 @@
-"""Startup data backfill scheduler.
+"""Data backfill scheduler.
 
-Runs once on startup to fill gaps across all data types.
-After backfill completes, WebSocket and periodic schedulers keep data fresh.
+Runs on startup and then every 10 minutes to detect and fill gaps.
+Works alongside WebSocket and periodic schedulers.
 
-Execution order (方案 A — 安全优先):
+Execution order:
   Phase 1: Funding history — OKX + Bybit  (no ban risk)
   Phase 2: Funding history — Binance       (moderate risk)
   Phase 3: Kline — 1d + 4h                 (important, few candles)
   Phase 4: Kline — 1h + 15m
   Phase 5: Kline — 5m                      (WS fills quickly, lowest priority)
-  Phase 6: Market history                   (self-hosted API, no risk)
-
-Rate control: sem=2, 1s between batches of 10, auto-pause 5min on 418.
 """
 import asyncio
 import logging
@@ -49,33 +46,49 @@ FUNDING_RETENTION_DAYS = 30
 BATCH_SIZE = 20
 BATCH_DELAY = 0.2         # seconds between batches
 RATE_LIMIT_PAUSE = 300    # 5 minutes pause on 418
+CHECK_INTERVAL = 600      # 10 minutes between periodic checks
 
 
 class DataBackfillScheduler:
-    """One-shot startup backfill for all data types."""
+    """Periodic data integrity checker and backfiller.
+
+    Runs immediately on startup, then every 10 minutes.
+    Each run checks all data types for gaps and fills them.
+    """
 
     def __init__(self) -> None:
         self._running = False
         self._task: Optional[asyncio.Task] = None
+        self._check_in_progress = False
 
     def start_background(self) -> None:
-        """Launch backfill as a background task."""
+        """Launch the periodic backfill loop."""
         if self._running:
             return
         self._running = True
-        self._task = asyncio.ensure_future(self._run())
+        self._task = asyncio.ensure_future(self._loop())
 
     def stop(self) -> None:
         self._running = False
         if self._task:
             self._task.cancel()
 
-    async def _run(self) -> None:
-        """Execute all phases sequentially."""
+    async def _loop(self) -> None:
+        """Run backfill check on startup, then every CHECK_INTERVAL seconds."""
+        try:
+            while self._running:
+                await self._run_once()
+                # Wait for next check
+                await asyncio.sleep(CHECK_INTERVAL)
+        except asyncio.CancelledError:
+            pass
+
+    async def _run_once(self) -> None:
+        """Execute one full backfill check across all data types."""
+        if self._check_in_progress:
+            return
+        self._check_in_progress = True
         t0 = time.time()
-        logger.info("=" * 60)
-        logger.info("DATA BACKFILL START")
-        logger.info("=" * 60)
 
         try:
             # Phase 1: Funding — OKX + Bybit (safe)
@@ -94,15 +107,13 @@ class DataBackfillScheduler:
             await self._backfill_klines(["5m"])
 
             elapsed = time.time() - t0
-            logger.info("=" * 60)
-            logger.info("DATA BACKFILL COMPLETE in %.0f seconds", elapsed)
-            logger.info("=" * 60)
+            logger.info("Data backfill check done in %.0f seconds", elapsed)
         except asyncio.CancelledError:
-            logger.info("Data backfill cancelled")
+            raise
         except Exception as exc:
-            logger.error("Data backfill failed: %s", exc)
+            logger.error("Data backfill check failed: %s", exc)
         finally:
-            self._running = False
+            self._check_in_progress = False
 
     # ==================================================================
     # Kline backfill
