@@ -43,11 +43,9 @@ class NewListingScheduler:
         self._alerts = []
 
     async def get_cached_data_async(self) -> dict[str, list[dict[str, Any]]]:
-        """Return cached data, falling back to DB if memory is empty."""
-        has_data = any(len(v) > 0 for v in self._cached_data.values())
-        if not has_data:
-            # Load from DB
-            for exchange in ["okx", "binance", "bybit"]:
+        """Return cached data, falling back to DB per exchange if memory is empty."""
+        for exchange in ["okx", "binance", "bybit"]:
+            if not self._cached_data[exchange]:
                 try:
                     db_data = await new_listing_service.get_from_db(exchange)
                     if db_data:
@@ -77,9 +75,13 @@ class NewListingScheduler:
             now = datetime.now()
 
             for ex_key, data in exchange_map.items():
-                if isinstance(data, list):
+                if isinstance(data, list) and len(data) > 0:
                     self._cached_data[ex_key] = data
                     await new_listing_service.save_to_db(exchange_label[ex_key], data)
+                elif isinstance(data, list) and len(data) == 0:
+                    # API returned empty (possibly rate limited) — keep existing data
+                    logger.warning("New listing %s returned empty, keeping existing data", exchange_label[ex_key])
+                    continue
 
                     # Detect new coins
                     current_coins = {item.get("coin_name", "") for item in data if item.get("coin_name")}
