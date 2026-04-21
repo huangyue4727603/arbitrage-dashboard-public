@@ -20,7 +20,7 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
       title: '币种',
       dataIndex: 'coin',
       key: 'coin',
-      width: 90,
+      width: 75,
       fixed: 'left',
       render: (coin: string) => (
         <a
@@ -35,7 +35,7 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
     {
       title: '做多总资费/交易所',
       key: 'long_funding_ex',
-      width: 170,
+      width: 155,
       render: (_, record) => (
         <span style={{ color: record.long_total_funding >= 0 ? '#22AB94' : '#F23645' }}>
           {record.long_total_funding >= 0 ? '+' : ''}
@@ -49,7 +49,7 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
     {
       title: '做空总资费/交易所',
       key: 'short_funding_ex',
-      width: 170,
+      width: 155,
       sorter: (a, b) => a.short_total_funding - b.short_total_funding,
       render: (_, record) => (
         <span style={{ color: record.short_total_funding >= 0 ? '#22AB94' : '#F23645' }}>
@@ -62,10 +62,9 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
       ),
     },
     {
-      title: '做多结算次数/周期',
+      title: '做多结算',
       key: 'long_count_period',
-      width: 140,
-      align: 'center',
+      width: 95,
       render: (_, record) => (
         <span>
           {record.long_settlement_count}次
@@ -74,10 +73,9 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
       ),
     },
     {
-      title: '做空结算次数/周期',
+      title: '做空结算',
       key: 'short_count_period',
-      width: 140,
-      align: 'center',
+      width: 95,
       render: (_, record) => (
         <span>
           {record.short_settlement_count}次
@@ -89,7 +87,7 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
       title: '总资费差额',
       dataIndex: 'total_diff',
       key: 'total_diff',
-      width: 120,
+      width: 100,
       sorter: (a, b) => a.total_diff - b.total_diff,
       defaultSortOrder: 'descend',
       render: (val: number, record: RankItem) => (
@@ -103,10 +101,10 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
       ),
     },
     {
-      title: '1d涨幅',
+      title: '1d',
       dataIndex: 'change_1d',
       key: 'change_1d',
-      width: 90,
+      width: 75,
       sorter: (a, b) => (a.change_1d ?? 0) - (b.change_1d ?? 0),
       render: (val?: number) =>
         val !== undefined ? (
@@ -118,10 +116,10 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
         ),
     },
     {
-      title: '3d涨幅',
+      title: '3d',
       dataIndex: 'change_3d',
       key: 'change_3d',
-      width: 90,
+      width: 75,
       sorter: (a, b) => (a.change_3d ?? 0) - (b.change_3d ?? 0),
       render: (val?: number) =>
         val !== undefined ? (
@@ -136,7 +134,7 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
       title: '开差',
       dataIndex: 'current_spread',
       key: 'current_spread',
-      width: 90,
+      width: 80,
       sorter: (a, b) => (a.current_spread ?? 0) - (b.current_spread ?? 0),
       render: (val?: number) =>
         val !== undefined ? (
@@ -152,7 +150,7 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
       title: '基差',
       dataIndex: 'current_basis',
       key: 'current_basis',
-      width: 90,
+      width: 80,
       sorter: (a, b) => (a.current_basis ?? 0) - (b.current_basis ?? 0),
       render: (val?: number) =>
         val !== undefined ? (
@@ -168,7 +166,7 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
       title: 'bn_alpha',
       dataIndex: 'bn_alpha',
       key: 'bn_alpha',
-      width: 95,
+      width: 80,
       sorter: (a, b) => (a.bn_alpha ?? 0) - (b.bn_alpha ?? 0),
       render: (val?: number) =>
         val ? (
@@ -181,7 +179,7 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
       title: 'bn_future',
       dataIndex: 'bn_future',
       key: 'bn_future',
-      width: 95,
+      width: 80,
       sorter: (a, b) => (a.bn_future ?? 0) - (b.bn_future ?? 0),
       render: (val?: number) =>
         val ? (
@@ -194,8 +192,7 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
       title: '持仓量',
       dataIndex: 'oi',
       key: 'oi',
-      width: 100,
-      align: 'right',
+      width: 85,
       sorter: (a, b) => (a.oi ?? 0) - (b.oi ?? 0),
       render: (val?: number) =>
         val ? (
@@ -208,8 +205,7 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
       title: '多空比',
       dataIndex: 'lsr',
       key: 'lsr',
-      width: 90,
-      align: 'right',
+      width: 75,
       sorter: (a, b) => (a.lsr ?? 0) - (b.lsr ?? 0),
       render: (val?: number) =>
         val ? (
@@ -225,7 +221,6 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
       dataIndex: 'bn_spot',
       key: 'bn_spot',
       width: 80,
-      align: 'center',
       filters: [
         { text: '有现货', value: true },
         { text: '无现货', value: false },
@@ -248,7 +243,7 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
       rowKey={(record) => `${record.coin}_${record.long_exchange}_${record.short_exchange}`}
       pagination={{ pageSize: 50, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
       size="small"
-      scroll={{ x: 1280 }}
+      scroll={{ x: 1500 }}
     />
   );
 }
