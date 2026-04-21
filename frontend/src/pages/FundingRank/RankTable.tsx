@@ -46,7 +46,7 @@ export default function RankTable({ data, loading, onDiffClick, onWatchToggle }:
       title: '币种',
       dataIndex: 'coin',
       key: 'coin',
-      width: 72,
+      width: 65,
       fixed: 'left',
       render: (coin: string) => (
         <a href={`https://www.coinglass.com/tv/zh/Binance_${coin}USDT`} target="_blank" rel="noopener noreferrer">
@@ -57,7 +57,7 @@ export default function RankTable({ data, loading, onDiffClick, onWatchToggle }:
     {
       title: '做多总资费',
       key: 'long_funding_ex',
-      width: 105,
+      width: 95,
       render: (_, r) => (
         <span style={{ color: r.long_total_funding >= 0 ? '#22AB94' : '#F23645' }}>
           {r.long_total_funding >= 0 ? '+' : ''}{r.long_total_funding.toFixed(2)}%
@@ -68,7 +68,7 @@ export default function RankTable({ data, loading, onDiffClick, onWatchToggle }:
     {
       title: '做空总资费',
       key: 'short_funding_ex',
-      width: 105,
+      width: 95,
       sorter: (a, b) => a.short_total_funding - b.short_total_funding,
       render: (_, r) => (
         <span style={{ color: r.short_total_funding >= 0 ? '#22AB94' : '#F23645' }}>
@@ -81,7 +81,7 @@ export default function RankTable({ data, loading, onDiffClick, onWatchToggle }:
       title: '资费差额',
       dataIndex: 'total_diff',
       key: 'total_diff',
-      width: 80,
+      width: 75,
       sorter: (a, b) => a.total_diff - b.total_diff,
       defaultSortOrder: 'descend',
       render: (val: number, record: RankItem) => (
