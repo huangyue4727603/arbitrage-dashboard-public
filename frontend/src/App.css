@@ -89,7 +89,7 @@ body { background: var(--bg-page); color: var(--text); }
   color: var(--text-2) !important;
   font-weight: 500 !important;
   font-size: 12px !important;
-  padding: 14px 12px !important;
+  padding: 10px 4px !important;
   border-bottom: none !important;
 }
 .ant-table-thead > tr > th::before { display: none !important; }
@@ -116,12 +116,12 @@ body { background: var(--bg-page); color: var(--text); }
 .ant-table-measure-row td { padding: 0 !important; height: 0 !important; border: none !important; }
 .ant-table-summary { border-top: 1px solid var(--border) !important; }
 .ant-table-tbody > tr > td {
-  padding: 11px 12px !important;
+  padding: 8px 4px !important;
   border-bottom: 1px solid var(--border-soft) !important;
   color: var(--text) !important;
   font-weight: 500 !important;
   background: transparent !important;
-  font-size: 13px !important;
+  font-size: 12px !important;
 }
 /* Subtle zebra striping */
 .ant-table-tbody > tr:nth-child(even) > td {

@@ -246,8 +246,9 @@ export default function RankTable({ data, loading, onDiffClick, onWatchToggle }:
       rowKey={(record) => `${record.coin}_${record.long_exchange}_${record.short_exchange}`}
       pagination={{ pageSize: 50, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
       size="small"
-      scroll={{ x: 1600 }}
-      style={{ fontSize: 13 }}
+      scroll={{ x: 1400 }}
+      className="compact-table"
+      style={{ fontSize: 12 }}
     />
     <Modal
       title={indexModal ? `${indexModal.coin} 指数成分（${exLabel[indexModal.long_exchange] || indexModal.long_exchange} vs ${exLabel[indexModal.short_exchange] || indexModal.short_exchange}）` : ''}
