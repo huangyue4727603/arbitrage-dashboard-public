@@ -150,15 +150,20 @@ export const fundingApi = {
 
   getWatchlist: async (): Promise<string[]> => {
     const res = await client.get('/api/funding-rank/watchlist');
-    return res.data.data;
+    return res.data.data;  // ['COIN_LONGEX_SHORTEX', ...]
   },
 
-  addWatch: async (coin: string): Promise<void> => {
-    await client.post(`/api/funding-rank/watchlist/${coin}`);
+  addWatch: async (coin: string, longExchange: string, shortExchange: string): Promise<void> => {
+    await client.post('/api/funding-rank/watchlist', {
+      coin, long_exchange: longExchange, short_exchange: shortExchange,
+    });
   },
 
-  removeWatch: async (coin: string): Promise<void> => {
-    await client.delete(`/api/funding-rank/watchlist/${coin}`);
+  removeWatch: async (coin: string, longExchange: string, shortExchange: string): Promise<void> => {
+    await client.request({
+      method: 'DELETE', url: '/api/funding-rank/watchlist',
+      data: { coin, long_exchange: longExchange, short_exchange: shortExchange },
+    });
   },
 
   getBnSpot: async (): Promise<string[]> => {

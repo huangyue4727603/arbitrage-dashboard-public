@@ -6,7 +6,7 @@ interface RankTableProps {
   data: RankItem[];
   loading: boolean;
   onDiffClick: (record: RankItem) => void;
-  onWatchToggle?: (coin: string) => void;
+  onWatchToggle?: (coin: string, longEx: string, shortEx: string) => void;
 }
 
 const exLabel: Record<string, string> = { BN: 'BN', OKX: 'OKX', BY: 'BY' };
@@ -20,7 +20,7 @@ export default function RankTable({ data, loading, onDiffClick, onWatchToggle }:
       fixed: 'left',
       render: (_, r) => (
         <span
-          onClick={(e) => { e.stopPropagation(); onWatchToggle?.(r.coin); }}
+          onClick={(e) => { e.stopPropagation(); onWatchToggle?.(r.coin, r.long_exchange, r.short_exchange); }}
           style={{ cursor: 'pointer', fontSize: 16, color: r.watched ? '#faad14' : '#e0e0e0' }}
         >
           {r.watched ? '★' : '☆'}
@@ -65,7 +65,7 @@ export default function RankTable({ data, loading, onDiffClick, onWatchToggle }:
     {
       title: '做多结算',
       key: 'long_count_period',
-      width: 85,
+      width: 75,
       render: (_, r) => (
         <span>{r.long_settlement_count}<span style={{ color: '#999' }}>/{r.long_settlement_period}h</span></span>
       ),
@@ -73,7 +73,7 @@ export default function RankTable({ data, loading, onDiffClick, onWatchToggle }:
     {
       title: '做空结算',
       key: 'short_count_period',
-      width: 85,
+      width: 75,
       render: (_, r) => (
         <span>{r.short_settlement_count}<span style={{ color: '#999' }}>/{r.short_settlement_period}h</span></span>
       ),
@@ -82,7 +82,7 @@ export default function RankTable({ data, loading, onDiffClick, onWatchToggle }:
       title: '资费差额',
       dataIndex: 'total_diff',
       key: 'total_diff',
-      width: 90,
+      width: 80,
       sorter: (a, b) => a.total_diff - b.total_diff,
       defaultSortOrder: 'descend',
       render: (val: number, record: RankItem) => (

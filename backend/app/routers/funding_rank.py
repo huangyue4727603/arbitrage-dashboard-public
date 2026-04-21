@@ -243,7 +243,7 @@ async def get_bn_spot():
 
 @router.get("/watchlist")
 async def get_watchlist(user_id: Optional[int] = Depends(get_optional_user_id)):
-    """Get user's watched coins."""
+    """Get user's watched items as list of 'COIN_LONGEX_SHORTEX' keys."""
     if not user_id:
         return {"data": []}
     from sqlalchemy import select as sa_select
@@ -251,30 +251,40 @@ async def get_watchlist(user_id: Optional[int] = Depends(get_optional_user_id)):
     from app.models.market_data import UserWatchlist
     async with async_session_factory() as db:
         result = await db.execute(
-            sa_select(UserWatchlist.coin).where(UserWatchlist.user_id == user_id)
+            sa_select(UserWatchlist.coin, UserWatchlist.long_exchange, UserWatchlist.short_exchange)
+            .where(UserWatchlist.user_id == user_id)
         )
-        return {"data": [row[0] for row in result.all()]}
+        return {"data": [f"{r[0]}_{r[1]}_{r[2]}" for r in result.all()]}
 
 
-@router.post("/watchlist/{coin}")
-async def add_watchlist(coin: str, user_id: Optional[int] = Depends(get_optional_user_id)):
-    """Add a coin to user's watchlist."""
+class WatchlistBody(BaseModel):
+    coin: str
+    long_exchange: str
+    short_exchange: str
+
+
+@router.post("/watchlist")
+async def add_watchlist(body: WatchlistBody, user_id: Optional[int] = Depends(get_optional_user_id)):
+    """Add a coin+exchange pair to user's watchlist."""
     if not user_id:
         raise HTTPException(status_code=401, detail="Login required")
     from sqlalchemy.dialects.mysql import insert as mysql_insert
     from app.database import async_session_factory
     from app.models.market_data import UserWatchlist
     async with async_session_factory() as db:
-        stmt = mysql_insert(UserWatchlist).values(user_id=user_id, coin=coin.upper())
+        stmt = mysql_insert(UserWatchlist).values(
+            user_id=user_id, coin=body.coin.upper(),
+            long_exchange=body.long_exchange, short_exchange=body.short_exchange,
+        )
         stmt = stmt.on_duplicate_key_update(coin=stmt.inserted.coin)
         await db.execute(stmt)
         await db.commit()
     return {"ok": True}
 
 
-@router.delete("/watchlist/{coin}")
-async def remove_watchlist(coin: str, user_id: Optional[int] = Depends(get_optional_user_id)):
-    """Remove a coin from user's watchlist."""
+@router.delete("/watchlist")
+async def remove_watchlist(body: WatchlistBody, user_id: Optional[int] = Depends(get_optional_user_id)):
+    """Remove a coin+exchange pair from user's watchlist."""
     if not user_id:
         raise HTTPException(status_code=401, detail="Login required")
     from sqlalchemy import delete as sa_delete
@@ -284,7 +294,9 @@ async def remove_watchlist(coin: str, user_id: Optional[int] = Depends(get_optio
         await db.execute(
             sa_delete(UserWatchlist)
             .where(UserWatchlist.user_id == user_id)
-            .where(UserWatchlist.coin == coin.upper())
+            .where(UserWatchlist.coin == body.coin.upper())
+            .where(UserWatchlist.long_exchange == body.long_exchange)
+            .where(UserWatchlist.short_exchange == body.short_exchange)
         )
         await db.commit()
     return {"ok": True}

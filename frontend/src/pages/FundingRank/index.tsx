@@ -93,13 +93,18 @@ export default function FundingRank() {
   }, []);
   useEffect(() => { refreshWatchlist(); }, [isLoggedIn, refreshWatchlist]);
 
-  const toggleWatch = useCallback(async (coin: string) => {
-    if (watchlist.has(coin)) {
-      await fundingApi.removeWatch(coin);
-    } else {
-      await fundingApi.addWatch(coin);
+  const toggleWatch = useCallback(async (coin: string, longEx: string, shortEx: string) => {
+    const key = `${coin}_${longEx}_${shortEx}`;
+    try {
+      if (watchlist.has(key)) {
+        await fundingApi.removeWatch(coin, longEx, shortEx);
+      } else {
+        await fundingApi.addWatch(coin, longEx, shortEx);
+      }
+      refreshWatchlist();
+    } catch {
+      // silent — user not logged in
     }
-    refreshWatchlist();
   }, [watchlist, refreshWatchlist]);
 
   // Poll price trend every 5 minutes
@@ -205,7 +210,7 @@ export default function FundingRank() {
         index_overlap: indexOverlap[overlapKey],
         bn_alpha: bnIndexWeights[item.coin]?.alpha,
         bn_future: bnIndexWeights[item.coin]?.future,
-        watched: watchlist.has(item.coin),
+        watched: watchlist.has(`${item.coin}_${item.long_exchange}_${item.short_exchange}`),
         bn_spot: bnSpotCoins.has(item.coin),
         oi: oiLsr[item.coin]?.oi,
         lsr: oiLsr[item.coin]?.lsr,

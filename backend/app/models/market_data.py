@@ -214,15 +214,17 @@ class LsrSnapshot5m(Base):
 
 
 class UserWatchlist(Base):
-    """Per-user coin watchlist for funding rank."""
+    """Per-user watchlist for funding rank (coin + exchange pair)."""
     __tablename__ = "arb_user_watchlist"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(Integer, nullable=False)
     coin: Mapped[str] = mapped_column(String(50), nullable=False)
+    long_exchange: Mapped[str] = mapped_column(String(10), nullable=False)
+    short_exchange: Mapped[str] = mapped_column(String(10), nullable=False)
 
     __table_args__ = (
-        UniqueConstraint("user_id", "coin", name="uq_user_watchlist"),
+        UniqueConstraint("user_id", "coin", "long_exchange", "short_exchange", name="uq_user_watchlist"),
         Index("ix_user_watchlist_user", "user_id"),
     )
 
