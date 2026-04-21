@@ -67,7 +67,7 @@ export default function RankTable({ data, loading, onDiffClick, onWatchToggle }:
       key: 'long_count_period',
       width: 75,
       render: (_, r) => (
-        <span>{r.long_settlement_count}<span style={{ color: '#999' }}>/{r.long_settlement_period}h</span></span>
+        <span>{r.long_settlement_count}次<span style={{ color: '#999' }}>/{r.long_settlement_period}h</span></span>
       ),
     },
     {
@@ -75,7 +75,7 @@ export default function RankTable({ data, loading, onDiffClick, onWatchToggle }:
       key: 'short_count_period',
       width: 75,
       render: (_, r) => (
-        <span>{r.short_settlement_count}<span style={{ color: '#999' }}>/{r.short_settlement_period}h</span></span>
+        <span>{r.short_settlement_count}次<span style={{ color: '#999' }}>/{r.short_settlement_period}h</span></span>
       ),
     },
     {
