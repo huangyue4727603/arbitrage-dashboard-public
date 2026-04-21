@@ -244,7 +244,14 @@ export default function RankTable({ data, loading, onDiffClick, onWatchToggle }:
       dataSource={data}
       loading={loading}
       rowKey={(record) => `${record.coin}_${record.long_exchange}_${record.short_exchange}`}
-      pagination={{ pageSize: 50, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
+      pagination={{ pageSize: 50, showSizeChanger: true, showTotal: (t) => `共 ${t} 条`,
+        onChange: (page, pageSize) => { fundingApi.logAction('page_change', `page=${page}&size=${pageSize}`); },
+      }}
+      onChange={(_pagination, _filters, sorter) => {
+        if (sorter && !Array.isArray(sorter) && sorter.field) {
+          fundingApi.logAction('sort', `${String(sorter.field)}_${sorter.order || 'none'}`);
+        }
+      }}
       size="small"
       scroll={{ x: 1400 }}
       className="compact-table"

@@ -176,6 +176,10 @@ export const fundingApi = {
     });
   },
 
+  logAction: async (action: string, detail?: string): Promise<void> => {
+    client.post('/api/funding-rank/action-log', { action, detail }).catch(() => {});
+  },
+
   getBnSpot: async (): Promise<string[]> => {
     const res = await client.get('/api/funding-rank/bn-spot');
     return res.data.data;

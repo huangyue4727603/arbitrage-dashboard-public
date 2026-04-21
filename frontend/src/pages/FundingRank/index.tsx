@@ -398,15 +398,15 @@ export default function FundingRank() {
         </div>
         <div className={s.filterGroup}>
           <span className={s.filterLabel}>币种</span>
-          <Select showSearch allowClear value={coinFilter || undefined} onChange={(v) => setCoinFilter(v || '')} options={coinOptions} placeholder="搜索" style={{ width: 100 }} filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())} />
+          <Select showSearch allowClear value={coinFilter || undefined} onChange={(v) => { setCoinFilter(v || ''); if (v) fundingApi.logAction('filter_coin', v); }} options={coinOptions} placeholder="搜索" style={{ width: 100 }} filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())} />
         </div>
         <div className={s.filterGroup}>
           <span className={s.filterLabel}>做多</span>
-          <Select value={longExchange} onChange={setLongExchange} options={exchangeOptions} style={{ width: 110 }} />
+          <Select value={longExchange} onChange={(v) => { setLongExchange(v); if (v) fundingApi.logAction('filter_long_exchange', v); }} options={exchangeOptions} style={{ width: 110 }} />
         </div>
         <div className={s.filterGroup}>
           <span className={s.filterLabel}>做空</span>
-          <Select value={shortExchange} onChange={setShortExchange} options={exchangeOptions} style={{ width: 110 }} />
+          <Select value={shortExchange} onChange={(v) => { setShortExchange(v); if (v) fundingApi.logAction('filter_short_exchange', v); }} options={exchangeOptions} style={{ width: 110 }} />
         </div>
         <div className={s.filterGroup}>
           <span className={s.filterLabel}>关注</span>
@@ -454,6 +454,7 @@ export default function FundingRank() {
           setLongPeriods([]); setShortPeriods([]);
           setMinSpread(null); setMaxSpread(null); setMinBasis(null); setMaxBasis(null);
           setWatchFilter(''); setBnSpotFilter(''); setTrendFilter([]); setMinLsr(null); setMaxLsr(null);
+          fundingApi.logAction('filter_reset');
         }}>重置</Button>
       </div>
 

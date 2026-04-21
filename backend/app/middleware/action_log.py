@@ -33,6 +33,7 @@ SKIP_PATHS = {
     "/api/auth/me",
     "/api/settings/notification",
     "/api/settings/theme",
+    "/api/funding-rank/action-log",
 }
 
 
@@ -48,14 +49,6 @@ class ActionLogMiddleware(BaseHTTPMiddleware):
         if path in SKIP_PATHS:
             return await call_next(request)
 
-        # Skip GET requests to common list/query endpoints (auto-refresh)
-        if request.method == "GET" and path.startswith("/api/funding-rank") and path not in (
-            "/api/funding-rank/detail",
-            "/api/funding-rank/watchlist",
-            "/api/funding-rank/index-detail",
-            "/api/funding-rank/coins",
-        ):
-            return await call_next(request)
 
         t0 = time.time()
 

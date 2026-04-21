@@ -26,6 +26,37 @@ _PAIR_MAP = {
 }
 
 
+class ActionLogBody(BaseModel):
+    action: str         # e.g. "sort", "filter", "page_change"
+    detail: Optional[str] = None  # e.g. "total_diff_descend", "coin=BTC"
+
+
+@router.post("/action-log")
+async def log_action(body: ActionLogBody, user_id: Optional[int] = Depends(get_optional_user_id)):
+    """Log a frontend user action (sort, filter, etc.)."""
+    import asyncio
+    from sqlalchemy.dialects.mysql import insert as mysql_insert
+    from app.database import async_session_factory
+    from app.models.market_data import UserActionLog
+
+    async def _save():
+        try:
+            async with async_session_factory() as db:
+                await db.execute(mysql_insert(UserActionLog).values(
+                    user_id=user_id,
+                    method="ACTION",
+                    path=body.action,
+                    query=body.detail,
+                    status_code=200,
+                ))
+                await db.commit()
+        except Exception:
+            pass
+
+    asyncio.create_task(_save())
+    return {"ok": True}
+
+
 class CalculatorRequest(BaseModel):
     coin: str
     long_exchange: str
