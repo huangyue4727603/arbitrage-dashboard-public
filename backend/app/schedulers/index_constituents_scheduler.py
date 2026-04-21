@@ -42,6 +42,7 @@ class IndexConstituentsScheduler:
         self._tasks: list[asyncio.Task] = []
         self._stopped = False
         self._coin_list: list[str] = []
+        self._scheduler = None
         self._coin_set: set[str] = set()
         self._last_coin_refresh: float = 0
         # Priority queue for new coins (first-time)
@@ -132,22 +133,24 @@ class IndexConstituentsScheduler:
         return out
 
     async def _exchange_loop(self, exchange: str, fetcher) -> None:
-        """Generic batch fetcher: BATCH coins in parallel, then sleep."""
-        idx = 0
-        while not self._stopped:
-            try:
-                await self._ensure_coin_list()
-                if not self._coin_list:
-                    await asyncio.sleep(5)
-                    continue
+        """Fetch all coins once for an exchange, then stop."""
+        try:
+            await self._ensure_coin_list()
+            if not self._coin_list:
+                return
+
+            total = len(self._coin_list)
+            ok_total = 0
+
+            for i in range(0, total, BATCH):
+                if self._stopped:
+                    break
 
                 # Priority first
                 batch = await self._drain_priority(BATCH)
-                if len(batch) < BATCH:
-                    n = len(self._coin_list)
-                    for _ in range(BATCH - len(batch)):
-                        batch.append(self._coin_list[idx % n])
-                        idx += 1
+                remaining = BATCH - len(batch)
+                if remaining > 0:
+                    batch.extend(self._coin_list[i:i + remaining])
 
                 results = await asyncio.gather(*(fetcher(c) for c in batch), return_exceptions=True)
                 ok = 0
@@ -158,18 +161,19 @@ class IndexConstituentsScheduler:
                         ok += 1
                     elif isinstance(r, Exception) and "418" in str(r):
                         rate_limited = True
-                logger.info("[%s] batch=%d ok=%d", exchange, len(batch), ok)
+                ok_total += ok
 
                 if rate_limited or (ok == 0 and len(batch) > 2):
-                    logger.warning("[%s] Rate limited or all failed, pausing 5 minutes", exchange)
+                    logger.warning("[%s] Rate limited, pausing 5 minutes", exchange)
                     await asyncio.sleep(300)
                 else:
                     await asyncio.sleep(BATCH_SLEEP_SEC)
-            except asyncio.CancelledError:
-                break
-            except Exception as exc:
-                logger.error("%s loop error: %s", exchange, exc)
-                await asyncio.sleep(10)
+
+            logger.info("[%s] daily refresh done: %d/%d coins", exchange, ok_total, total)
+        except asyncio.CancelledError:
+            pass
+        except Exception as exc:
+            logger.error("%s loop error: %s", exchange, exc)
 
     async def _slow_loop(self) -> None:
         """Bybit Playwright fetcher (slow)."""
@@ -205,26 +209,55 @@ class IndexConstituentsScheduler:
                 logger.error("new_coin_detector error: %s", exc)
             await asyncio.sleep(300)  # every 5min
 
+    # ---------------- daily refresh ----------------
+    async def refresh_all(self) -> None:
+        """Run one full refresh for all exchanges."""
+        self._stopped = False
+        logger.info("index_constituents: daily refresh starting")
+        await self._ensure_coin_list()
+        try:
+            await self._detect_and_queue_new()
+        except Exception:
+            pass
+        await asyncio.gather(
+            self._exchange_loop("BN", fetch_binance),
+            self._exchange_loop("OKX", fetch_okx),
+            self._exchange_loop("BY", fetch_bybit),
+        )
+        logger.info("index_constituents: daily refresh complete")
+
     # ---------------- lifecycle ----------------
     def start(self) -> None:
-        if self._tasks:
+        if self._scheduler is not None:
             return
-        self._stopped = False
-        loop = asyncio.get_event_loop()
-        import os
-        self._tasks = [
-            loop.create_task(self._exchange_loop("BN", fetch_binance), name="idx_const_bn"),
-            loop.create_task(self._exchange_loop("OKX", fetch_okx), name="idx_const_okx"),
-            loop.create_task(self._exchange_loop("BY", fetch_bybit), name="idx_const_by"),
-            loop.create_task(self._new_coin_detector_loop(), name="idx_const_detect"),
-        ]
-        logger.info(
-            "index_constituents_scheduler started (batch=%d/%ds per worker, slow=%ds)",
-            BATCH, BATCH_SLEEP_SEC, SLOW_SLEEP_SEC,
+        from apscheduler.schedulers.asyncio import AsyncIOScheduler
+        from apscheduler.triggers.cron import CronTrigger
+        from datetime import timedelta
+
+        self._scheduler = AsyncIOScheduler()
+        self._scheduler.add_job(
+            self.refresh_all,
+            trigger=CronTrigger(hour=2, minute=0),
+            id="idx_const_daily",
+            name="Daily index constituents refresh",
+            replace_existing=True,
         )
+        self._scheduler.add_job(
+            self.refresh_all,
+            id="idx_const_startup",
+            name="Startup index constituents refresh",
+            replace_existing=True,
+            next_run_time=datetime.now() + timedelta(seconds=30),
+        )
+        self._scheduler.start()
+        logger.info("index_constituents_scheduler started (daily at 02:00, batch=%d/%ds)",
+                     BATCH, BATCH_SLEEP_SEC)
 
     def stop(self) -> None:
         self._stopped = True
+        if self._scheduler is not None:
+            self._scheduler.shutdown(wait=False)
+            self._scheduler = None
         for t in self._tasks:
             if not t.done():
                 t.cancel()
