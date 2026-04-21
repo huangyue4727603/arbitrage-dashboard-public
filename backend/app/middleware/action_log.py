@@ -12,12 +12,49 @@ from app.utils.auth import verify_token
 
 logger = logging.getLogger(__name__)
 
+# Auto-refresh polling endpoints — skip logging
+SKIP_PATHS = {
+    "/api/health",
+    "/api/funding-rank/realtime",
+    "/api/funding-rank/price-changes",
+    "/api/funding-rank/oi-lsr",
+    "/api/funding-rank/index-overlap",
+    "/api/funding-rank/bn-index-weights",
+    "/api/funding-rank/bn-spot",
+    "/api/funding-break",
+    "/api/basis-monitor",
+    "/api/basis-monitor/coin-alerts",
+    "/api/basis-monitor/config",
+    "/api/price-trend",
+    "/api/new-listing",
+    "/api/unhedged",
+    "/api/premium-filter",
+    "/api/premium-filter/basis",
+    "/api/auth/me",
+    "/api/settings/notification",
+    "/api/settings/theme",
+}
+
+
 class ActionLogMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
         path = request.url.path
 
-        # Skip non-API paths (static files, websocket, docs)
+        # Skip non-API paths
         if not path.startswith("/api"):
+            return await call_next(request)
+
+        # Skip auto-refresh polling endpoints (only log user-initiated actions)
+        if path in SKIP_PATHS:
+            return await call_next(request)
+
+        # Skip GET requests to common list/query endpoints (auto-refresh)
+        if request.method == "GET" and path.startswith("/api/funding-rank") and path not in (
+            "/api/funding-rank/detail",
+            "/api/funding-rank/watchlist",
+            "/api/funding-rank/index-detail",
+            "/api/funding-rank/coins",
+        ):
             return await call_next(request)
 
         t0 = time.time()
