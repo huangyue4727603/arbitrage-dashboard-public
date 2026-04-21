@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { DatePicker, message, Select, InputNumber } from 'antd';
+import { DatePicker, message, Select, InputNumber, Button } from 'antd';
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
 import { fundingApi, type RankItem, type RealtimeData } from '../../api/funding';
@@ -448,6 +448,13 @@ export default function FundingRank() {
           <span className={s.filterLabel}>趋势</span>
           <Select mode="multiple" value={trendFilter} onChange={setTrendFilter} allowClear placeholder="全部" style={{ minWidth: 90, maxWidth: 200 }} options={[{ label: '日线', value: 'daily' }, { label: '4H', value: 'h4' }, { label: '1H', value: 'h1' }, { label: '15m', value: 'm15' }]} />
         </div>
+        <Button size="small" onClick={() => {
+          setDateRange([dayjs().subtract(1, 'day').startOf('hour'), dayjs().startOf('hour')]);
+          setCoinFilter(''); setLongExchange(''); setShortExchange('');
+          setLongPeriods([]); setShortPeriods([]);
+          setMinSpread(null); setMaxSpread(null); setMinBasis(null); setMaxBasis(null);
+          setWatchFilter(''); setBnSpotFilter(''); setTrendFilter([]); setMinLsr(null); setMaxLsr(null);
+        }}>重置</Button>
       </div>
 
       {/* ===== Table ===== */}
