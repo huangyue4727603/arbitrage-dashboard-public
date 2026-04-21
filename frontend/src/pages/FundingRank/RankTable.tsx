@@ -208,6 +208,36 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
         ),
     },
     {
+      title: '趋势',
+      key: 'trend',
+      width: 90,
+      render: (_, record) => {
+        const dots = [
+          { val: record.trend_daily, label: 'D' },
+          { val: record.trend_h4, label: '4H' },
+          { val: record.trend_h1, label: '1H' },
+          { val: record.trend_m15, label: '15m' },
+        ];
+        return (
+          <span style={{ display: 'flex', gap: 3, alignItems: 'center' }} title="日线 4H 1H 15m 多头排列">
+            {dots.map((d, i) => (
+              <span
+                key={i}
+                style={{
+                  display: 'inline-block',
+                  width: 12,
+                  height: 12,
+                  borderRadius: '50%',
+                  backgroundColor: d.val ? '#22AB94' : '#e0e0e0',
+                }}
+                title={`${d.label}: ${d.val ? '多头' : '—'}`}
+              />
+            ))}
+          </span>
+        );
+      },
+    },
+    {
       title: 'bn_alpha',
       dataIndex: 'bn_alpha',
       key: 'bn_alpha',

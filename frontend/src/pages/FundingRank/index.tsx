@@ -49,6 +49,7 @@ export default function FundingRank() {
   const [bnIndexWeights, setBnIndexWeights] = useState<Record<string, { alpha?: number; future?: number }>>({});
   const [bnSpotCoins, setBnSpotCoins] = useState<Set<string>>(new Set());
   const [oiLsr, setOiLsr] = useState<Record<string, { oi?: number; lsr?: number }>>({});
+  const [priceTrend, setPriceTrend] = useState<Record<string, { daily: boolean; h4: boolean; h1: boolean; m15: boolean }>>({});
 
   useEffect(() => {
     fundingApi.getCoins().then((list) => {
@@ -76,6 +77,14 @@ export default function FundingRank() {
 
   useEffect(() => {
     fundingApi.getBnSpot().then((list) => setBnSpotCoins(new Set(list))).catch(() => {});
+  }, []);
+
+  // Poll price trend every 5 minutes
+  useEffect(() => {
+    const fetch = () => { fundingApi.getPriceTrend().then(setPriceTrend).catch(() => {}); };
+    fetch();
+    const timer = setInterval(fetch, 300000);
+    return () => clearInterval(timer);
   }, []);
 
   // Poll OI/LSR every 5 minutes
@@ -176,6 +185,10 @@ export default function FundingRank() {
         bn_spot: bnSpotCoins.has(item.coin),
         oi: oiLsr[item.coin]?.oi,
         lsr: oiLsr[item.coin]?.lsr,
+        trend_daily: priceTrend[item.coin]?.daily,
+        trend_h4: priceTrend[item.coin]?.h4,
+        trend_h1: priceTrend[item.coin]?.h1,
+        trend_m15: priceTrend[item.coin]?.m15,
       };
     })
     .filter((item) => {

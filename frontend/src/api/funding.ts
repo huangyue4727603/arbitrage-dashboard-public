@@ -27,6 +27,11 @@ export interface RankItem {
   // OI & LSR
   oi?: number;   // open interest in USDT
   lsr?: number;  // long/short ratio
+  // Price trend (MA bullish alignment)
+  trend_daily?: boolean;
+  trend_h4?: boolean;
+  trend_h1?: boolean;
+  trend_m15?: boolean;
 }
 
 export interface RealtimeData {
@@ -124,6 +129,16 @@ export const fundingApi = {
   getBnIndexWeights: async (): Promise<Record<string, { alpha?: number; future?: number }>> => {
     const res = await client.get('/api/funding-rank/bn-index-weights');
     return res.data.data;
+  },
+
+  getPriceTrend: async (): Promise<Record<string, { daily: boolean; h4: boolean; h1: boolean; m15: boolean }>> => {
+    const res = await client.get('/api/price-trend');
+    const list = res.data.data as { coin_name: string; daily: boolean; h4: boolean; h1: boolean; m15: boolean }[];
+    const map: Record<string, { daily: boolean; h4: boolean; h1: boolean; m15: boolean }> = {};
+    for (const item of list) {
+      map[item.coin_name] = { daily: item.daily, h4: item.h4, h1: item.h1, m15: item.m15 };
+    }
+    return map;
   },
 
   getOiLsr: async (): Promise<Record<string, { oi?: number; lsr?: number }>> => {
