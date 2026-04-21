@@ -223,20 +223,18 @@ export default function RankTable({ data, loading, onDiffClick, onWatchToggle }:
       key: 'index_overlap',
       width: 80,
       sorter: (a, b) => (a.index_overlap ?? 0) - (b.index_overlap ?? 0),
-      render: (val: number | undefined, record: RankItem) =>
-        val !== undefined && val > 0 ? (
+      render: (val: number | undefined, record: RankItem) => {
+        const pct = val ?? 0;
+        const color = pct < 0.4 ? '#F23645' : undefined;
+        return (
           <span
             onClick={(e) => { e.stopPropagation(); showIndexDetail(record); }}
-            style={{ color: '#1677ff', cursor: 'pointer' }}
+            style={{ color, cursor: 'pointer', textDecoration: 'underline' }}
           >
-            {(val * 100).toFixed(1)}%
+            {(pct * 100).toFixed(1)}%
           </span>
-        ) : (
-          <span
-            onClick={(e) => { e.stopPropagation(); showIndexDetail(record); }}
-            style={{ color: '#d9d9d9', cursor: 'pointer' }}
-          >0%</span>
-        ),
+        );
+      },
     },
   ];
 
