@@ -259,8 +259,8 @@ class BinanceKlineWS:
                 logger.error("Kline WS DB writer error: %s", exc)
                 await asyncio.sleep(1)
 
-    async def _write_batch(self, batch: list[dict[str, Any]]):
-        """Write a batch of klines to DB using bulk insert."""
+    async def _write_batch(self, batch: list[dict[str, Any]], retry: int = 0):
+        """Write a batch of klines to DB using bulk insert, with retry on failure."""
         try:
             values = [
                 {
@@ -294,7 +294,14 @@ class BinanceKlineWS:
                 logger.info("Kline WS: stored %d candles (batch=%d, queue=%d)",
                             self._total_stored, len(batch), self._write_queue.qsize())
         except Exception as exc:
-            logger.error("Kline WS batch write failed (%d items): %s", len(batch), exc)
+            if retry < 3:
+                logger.warning("Kline WS batch write failed (retry %d/3, %d items): %s",
+                               retry + 1, len(batch), exc)
+                await asyncio.sleep(2 ** retry)  # 1s, 2s, 4s
+                await self._write_batch(batch, retry=retry + 1)
+            else:
+                logger.error("Kline WS batch write failed permanently (%d items lost): %s",
+                             len(batch), exc)
 
     def get_symbols(self) -> list[str]:
         return self._symbols

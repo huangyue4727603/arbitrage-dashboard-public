@@ -1,14 +1,13 @@
-"""Data backfill scheduler.
+"""Data backfill & health monitor scheduler.
 
-Runs on startup and then every 10 minutes to detect and fill gaps.
-Works alongside WebSocket and periodic schedulers.
+Responsibilities:
+  1. Periodic data integrity check + gap fill (every 10 min)
+  2. WebSocket health monitoring (every 60s)
+  3. Data freshness watchdog (every 60s)
+  4. All Binance REST calls use raw aiohttp to bypass BinanceClient cooldown
 
-Execution order:
-  Phase 1: Funding history — OKX + Bybit  (no ban risk)
-  Phase 2: Funding history — Binance       (moderate risk)
-  Phase 3: Kline — 1d + 4h                 (important, few candles)
-  Phase 4: Kline — 1h + 15m
-  Phase 5: Kline — 5m                      (WS fills quickly, lowest priority)
+Kline backfill bypasses BinanceClient entirely — uses direct HTTP to
+avoid being blocked by per-group cooldowns from other modules.
 """
 import asyncio
 import logging
@@ -16,20 +15,20 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
+import aiohttp
 from sqlalchemy import select, func
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 
 from app.database import async_session_factory
 from app.models.market_data import PriceKline, FundingHistory, FundingCap
-from app.services.exchange.binance import BinanceClient
 from app.services.funding_rank import FundingRankService, BINANCE, OKX, BYBIT
 
 logger = logging.getLogger(__name__)
 
 _UTC8 = timezone(timedelta(hours=8))
+BN_API = "https://fapi.binance.com"
 
 # ── Kline config ──
-# retention_hours → how many candles we expect, and how far back to fetch
 KLINE_INTERVALS = {
     "1d":  {"retention_hours": 4320, "candles": 180,  "limit": 180},
     "4h":  {"retention_hours": 720,  "candles": 180,  "limit": 180},
@@ -37,73 +36,164 @@ KLINE_INTERVALS = {
     "15m": {"retention_hours": 48,   "candles": 192,  "limit": 192},
     "5m":  {"retention_hours": 80,   "candles": 960,  "limit": 960},
 }
-KLINE_DENSITY_THRESHOLD = 0.7  # need at least 70% of expected candles
+KLINE_DENSITY_THRESHOLD = 0.7
 
 # ── Funding config ──
 FUNDING_RETENTION_DAYS = 30
 
 # ── Rate control ──
 BATCH_SIZE = 20
-BATCH_DELAY = 0.2         # seconds between batches
-RATE_LIMIT_PAUSE = 300    # 5 minutes pause on 418
-CHECK_INTERVAL = 600      # 10 minutes between periodic checks
+BATCH_DELAY = 0.2
+RATE_LIMIT_PAUSE = 300
+CHECK_INTERVAL = 600       # 10 min between backfill checks
+HEALTH_INTERVAL = 60       # 60s between health checks
+
+# ── Freshness thresholds (seconds) — warn if data older than this ──
+FRESHNESS_THRESHOLDS = {
+    "kline_5m": 600,        # 10 min (2 candle periods)
+    "kline_15m": 1800,      # 30 min
+    "kline_1h": 7200,       # 2 hours
+    "funding_BN": 3600 * 9, # 9 hours (8h period + buffer)
+    "funding_OKX": 3600 * 9,
+    "funding_BY": 3600 * 9,
+    "realtime": 30,         # 30 seconds
+}
 
 
 class DataBackfillScheduler:
-    """Periodic data integrity checker and backfiller.
-
-    Runs immediately on startup, then every 10 minutes.
-    Each run checks all data types for gaps and fills them.
-    """
+    """Periodic data integrity checker, backfiller, and health monitor."""
 
     def __init__(self) -> None:
         self._running = False
-        self._task: Optional[asyncio.Task] = None
+        self._backfill_task: Optional[asyncio.Task] = None
+        self._health_task: Optional[asyncio.Task] = None
         self._check_in_progress = False
+        # Track WS health
+        self._last_ws_kline_time: float = 0.0  # last time WS wrote a kline
+        self._ws_healthy = True
 
     def start_background(self) -> None:
-        """Launch the periodic backfill loop."""
         if self._running:
             return
         self._running = True
-        self._task = asyncio.ensure_future(self._loop())
+        self._backfill_task = asyncio.ensure_future(self._backfill_loop())
+        self._health_task = asyncio.ensure_future(self._health_loop())
 
     def stop(self) -> None:
         self._running = False
-        if self._task:
-            self._task.cancel()
+        for task in [self._backfill_task, self._health_task]:
+            if task:
+                task.cancel()
 
-    async def _loop(self) -> None:
-        """Run backfill check on startup, then every CHECK_INTERVAL seconds."""
+    # ==================================================================
+    # Health monitor loop (every 60s)
+    # ==================================================================
+
+    async def _health_loop(self) -> None:
+        """Monitor WS health and data freshness."""
+        try:
+            await asyncio.sleep(120)  # wait 2 min for startup
+            while self._running:
+                await self._check_ws_health()
+                await self._check_data_freshness()
+                await asyncio.sleep(HEALTH_INTERVAL)
+        except asyncio.CancelledError:
+            pass
+
+    async def _check_ws_health(self) -> None:
+        """Check if Binance kline WS is producing data."""
+        from app.services.binance_kline_ws import binance_kline_ws
+        current_stored = binance_kline_ws._total_stored
+
+        if self._last_ws_kline_time == 0:
+            # First check — just record baseline
+            self._last_ws_kline_time = time.time()
+            self._ws_healthy = True
+            return
+
+        # If no new klines in 10 minutes, WS is likely dead
+        elapsed = time.time() - self._last_ws_kline_time
+        if current_stored > getattr(self, '_last_ws_count', 0):
+            # WS produced data — healthy
+            self._last_ws_kline_time = time.time()
+            self._last_ws_count = current_stored
+            if not self._ws_healthy:
+                logger.info("WS health: Binance kline WS recovered")
+                self._ws_healthy = True
+        elif elapsed > 600:
+            # No new data in 10 min
+            if self._ws_healthy:
+                logger.warning("WS health: Binance kline WS appears down (no data for %.0fs), "
+                               "backfill will compensate", elapsed)
+                self._ws_healthy = False
+
+    async def _check_data_freshness(self) -> None:
+        """Check if each data type is fresh enough, log warnings."""
+        try:
+            async with async_session_factory() as db:
+                now = datetime.now()
+                warnings = []
+
+                # Kline freshness (check 5m, 15m, 1h)
+                for interval, threshold_key in [("5m", "kline_5m"), ("15m", "kline_15m"), ("1h", "kline_1h")]:
+                    r = await db.execute(
+                        select(func.max(PriceKline.kline_time))
+                        .where(PriceKline.interval_type == interval)
+                    )
+                    latest = r.scalar()
+                    if latest:
+                        age = (now - latest).total_seconds()
+                        threshold = FRESHNESS_THRESHOLDS[threshold_key]
+                        if age > threshold:
+                            warnings.append("kline_%s stale (%.0fmin old)" % (interval, age / 60))
+
+                # Funding freshness per exchange
+                for exchange in ["BN", "OKX", "BY"]:
+                    r = await db.execute(
+                        select(func.max(FundingHistory.funding_time))
+                        .where(FundingHistory.exchange == exchange)
+                    )
+                    latest = r.scalar()
+                    if latest:
+                        age = (now - latest).total_seconds()
+                        threshold = FRESHNESS_THRESHOLDS.get("funding_" + exchange, 3600 * 9)
+                        if age > threshold:
+                            warnings.append("funding_%s stale (%.0fh old)" % (exchange, age / 3600))
+
+                # Realtime data freshness
+                from app.services.data_fetcher import data_fetcher
+                cached = data_fetcher.get_cached_data()
+                if not cached or all(not v for v in cached.values()):
+                    warnings.append("realtime data empty")
+
+                if warnings:
+                    logger.warning("Data freshness: %s", "; ".join(warnings))
+        except Exception as exc:
+            logger.error("Freshness check failed: %s", exc)
+
+    # ==================================================================
+    # Backfill loop (every 10 min)
+    # ==================================================================
+
+    async def _backfill_loop(self) -> None:
         try:
             while self._running:
                 await self._run_once()
-                # Wait for next check
                 await asyncio.sleep(CHECK_INTERVAL)
         except asyncio.CancelledError:
             pass
 
     async def _run_once(self) -> None:
-        """Execute one full backfill check across all data types."""
         if self._check_in_progress:
             return
         self._check_in_progress = True
         t0 = time.time()
 
         try:
-            # Phase 1: Funding — OKX + Bybit (safe)
             await self._backfill_funding([OKX, BYBIT])
-
-            # Phase 2: Funding — Binance
             await self._backfill_funding([BINANCE])
-
-            # Phase 3: Kline — 1d + 4h
             await self._backfill_klines(["1d", "4h"])
-
-            # Phase 4: Kline — 1h + 15m
             await self._backfill_klines(["1h", "15m"])
-
-            # Phase 5: Kline — 5m
             await self._backfill_klines(["5m"])
 
             elapsed = time.time() - t0
@@ -116,31 +206,26 @@ class DataBackfillScheduler:
             self._check_in_progress = False
 
     # ==================================================================
-    # Kline backfill
+    # Kline backfill — raw aiohttp, bypasses BinanceClient cooldown
     # ==================================================================
 
     async def _backfill_klines(self, intervals: list[str]) -> None:
-        """Backfill kline data for given intervals."""
-        # Get symbols
         symbols = await self._get_bn_symbols()
         if not symbols:
-            logger.warning("Kline backfill: no symbols, skipping")
             return
 
         sem = asyncio.Semaphore(10)
+        timeout = aiohttp.ClientTimeout(total=15)
 
         for interval in intervals:
             if not self._running:
                 return
 
             cfg = KLINE_INTERVALS[interval]
-            retention_hours = cfg["retention_hours"]
-            expected = cfg["candles"]
+            min_count = int(cfg["candles"] * KLINE_DENSITY_THRESHOLD)
             limit = cfg["limit"]
-            min_count = int(expected * KLINE_DENSITY_THRESHOLD)
 
-            # Check which symbols need backfill
-            cutoff = datetime.now() - timedelta(hours=retention_hours)
+            cutoff = datetime.now() - timedelta(hours=cfg["retention_hours"])
             try:
                 async with async_session_factory() as db:
                     result = await db.execute(
@@ -156,102 +241,99 @@ class DataBackfillScheduler:
 
             sparse = [s for s in symbols if counts.get(s, 0) < min_count]
             if not sparse:
-                logger.info("Kline backfill [%s]: all %d symbols OK (>=%d candles)",
-                            interval, len(symbols), min_count)
                 continue
 
-            logger.info("Kline backfill [%s]: %d/%d symbols sparse (need %d, limit=%d)",
-                        interval, len(sparse), len(symbols), min_count, limit)
+            logger.info("Kline backfill [%s]: %d/%d sparse (need %d)",
+                        interval, len(sparse), len(symbols), min_count)
 
             filled = 0
             rate_limited = False
 
-            async def fetch_one(client: BinanceClient, symbol: str, _interval: str, _limit: int) -> int:
-                nonlocal rate_limited
-                if rate_limited or not self._running:
-                    return 0
-                async with sem:
-                    try:
-                        klines = await client.get_klines(
-                            symbol=symbol, interval=_interval, limit=_limit, timeout=15
-                        )
-                        if not klines:
-                            return 0
-                        # Batch insert — one statement for all candles
-                        values = [
-                            {
-                                "symbol": symbol,
-                                "interval_type": _interval,
-                                "open_price": float(k[1]),
-                                "high_price": float(k[2]),
-                                "low_price": float(k[3]),
-                                "close_price": float(k[4]),
-                                "kline_time": datetime.fromtimestamp(int(k[0]) / 1000),
-                            }
-                            for k in klines
-                        ]
-                        async with async_session_factory() as db:
-                            stmt = mysql_insert(PriceKline).values(values)
-                            stmt = stmt.on_duplicate_key_update(
-                                open_price=stmt.inserted.open_price,
-                                high_price=stmt.inserted.high_price,
-                                low_price=stmt.inserted.low_price,
-                                close_price=stmt.inserted.close_price,
-                            )
-                            await db.execute(stmt)
-                            await db.commit()
-                        return len(klines)
-                    except Exception as exc:
-                        if "418" in str(exc) or "429" in str(exc):
-                            rate_limited = True
-                            logger.warning("Kline backfill [%s]: rate limited, pausing %ds",
-                                           _interval, RATE_LIMIT_PAUSE)
-                        else:
-                            logger.debug("Kline backfill [%s] %s failed: %s", _interval, symbol, exc)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async def fetch_one(symbol: str, _interval: str, _limit: int) -> int:
+                    nonlocal rate_limited
+                    if rate_limited or not self._running:
                         return 0
+                    async with sem:
+                        try:
+                            params = {"symbol": symbol, "interval": _interval, "limit": _limit}
+                            async with session.get(f"{BN_API}/fapi/v1/klines", params=params) as resp:
+                                if resp.status in (418, 429):
+                                    rate_limited = True
+                                    logger.warning("Kline backfill [%s]: rate limited", _interval)
+                                    return 0
+                                if resp.status != 200:
+                                    return 0
+                                klines = await resp.json()
+                            if not klines:
+                                return 0
+                            values = [
+                                {
+                                    "symbol": symbol,
+                                    "interval_type": _interval,
+                                    "open_price": float(k[1]),
+                                    "high_price": float(k[2]),
+                                    "low_price": float(k[3]),
+                                    "close_price": float(k[4]),
+                                    "kline_time": datetime.fromtimestamp(int(k[0]) / 1000),
+                                }
+                                for k in klines
+                            ]
+                            async with async_session_factory() as db:
+                                stmt = mysql_insert(PriceKline).values(values)
+                                stmt = stmt.on_duplicate_key_update(
+                                    open_price=stmt.inserted.open_price,
+                                    high_price=stmt.inserted.high_price,
+                                    low_price=stmt.inserted.low_price,
+                                    close_price=stmt.inserted.close_price,
+                                )
+                                await db.execute(stmt)
+                                await db.commit()
+                            return len(klines)
+                        except Exception as exc:
+                            if "418" in str(exc) or "429" in str(exc):
+                                rate_limited = True
+                            return 0
 
-            async with BinanceClient() as client:
                 for i in range(0, len(sparse), BATCH_SIZE):
                     if not self._running:
                         return
                     if rate_limited:
-                        # Pause then retry
-                        logger.info("Kline backfill [%s]: waiting %ds after rate limit...",
+                        logger.info("Kline backfill [%s]: pausing %ds after rate limit",
                                     interval, RATE_LIMIT_PAUSE)
                         await asyncio.sleep(RATE_LIMIT_PAUSE)
                         rate_limited = False
 
                     batch = sparse[i:i + BATCH_SIZE]
-                    tasks = [fetch_one(client, s, interval, limit) for s in batch]
+                    tasks = [fetch_one(s, interval, limit) for s in batch]
                     results = await asyncio.gather(*tasks)
                     filled += sum(results)
 
                     progress = min(i + BATCH_SIZE, len(sparse))
                     if progress % 50 == 0 or progress == len(sparse):
-                        logger.info("Kline backfill [%s]: %d/%d (filled %d records)",
+                        logger.info("Kline backfill [%s]: %d/%d (filled %d)",
                                     interval, progress, len(sparse), filled)
-
                     if i + BATCH_SIZE < len(sparse):
                         await asyncio.sleep(BATCH_DELAY)
 
-            logger.info("Kline backfill [%s]: done — %d records", interval, filled)
+            if filled > 0:
+                logger.info("Kline backfill [%s]: done — %d records", interval, filled)
 
     # ==================================================================
-    # Funding history backfill
+    # Funding backfill — also raw aiohttp for Binance
     # ==================================================================
 
     async def _backfill_funding(self, exchanges: list[str]) -> None:
-        """Backfill funding history for given exchanges."""
         svc = FundingRankService()
         now_ms = int(time.time() * 1000)
         start_ms = now_ms - FUNDING_RETENTION_DAYS * 24 * 3600 * 1000
-        sem = asyncio.Semaphore(2)
+        sem = asyncio.Semaphore(5)
+        timeout = aiohttp.ClientTimeout(total=30)
 
         for exchange in exchanges:
             if not self._running:
                 return
 
-            # Get coins for this exchange
             try:
                 coins = await svc._get_exchange_coins(exchange)
             except Exception as exc:
@@ -259,82 +341,111 @@ class DataBackfillScheduler:
                 continue
 
             if not coins:
-                logger.warning("Funding backfill [%s]: no coins found", exchange)
                 continue
 
-            # Check which coins are stale
             stale = await self._get_stale_funding_coins(exchange, coins)
             if not stale:
-                logger.info("Funding backfill [%s]: all %d coins up to date", exchange, len(coins))
                 continue
 
-            logger.info("Funding backfill [%s]: %d/%d coins need backfill",
-                        exchange, len(stale), len(coins))
+            logger.info("Funding backfill [%s]: %d/%d stale", exchange, len(stale), len(coins))
 
             total_stored = 0
-            failed = 0
 
-            async def fetch_one(coin: str) -> Optional[tuple]:
-                if not self._running:
-                    return None
-                async with sem:
-                    try:
-                        records = await svc._fetch_funding_for_exchange(
-                            exchange, coin, start_ms, now_ms
-                        )
-                        await asyncio.sleep(0.3)
-                        return (coin, records) if records else None
-                    except Exception:
-                        return None
+            if exchange == BINANCE:
+                # Raw aiohttp — bypass BinanceClient cooldown
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async def fetch_bn(coin: str):
+                        async with sem:
+                            symbol = coin + "USDT"
+                            all_records = []
+                            current_start = start_ms
+                            while current_start < now_ms:
+                                params = {"symbol": symbol, "startTime": current_start,
+                                          "endTime": now_ms, "limit": 1000}
+                                try:
+                                    async with session.get(
+                                        f"{BN_API}/fapi/v1/fundingRate", params=params
+                                    ) as resp:
+                                        if resp.status in (418, 429):
+                                            return None
+                                        if resp.status != 200:
+                                            break
+                                        records = await resp.json()
+                                except Exception:
+                                    break
+                                if not records:
+                                    break
+                                all_records.extend(records)
+                                last_t = int(records[-1].get("fundingTime", 0))
+                                if last_t <= current_start or len(records) < 1000:
+                                    break
+                                current_start = last_t + 1
+                            await asyncio.sleep(0.2)
+                            if not all_records:
+                                return None
+                            return (coin, [
+                                {"time_ms": int(r["fundingTime"]), "rate": float(r["fundingRate"])}
+                                for r in all_records
+                            ])
 
-            for i in range(0, len(stale), BATCH_SIZE):
-                if not self._running:
-                    return
-                batch = stale[i:i + BATCH_SIZE]
-                tasks = [fetch_one(coin) for coin in batch]
-                results = await asyncio.gather(*tasks)
+                    for i in range(0, len(stale), BATCH_SIZE):
+                        batch = stale[i:i + BATCH_SIZE]
+                        results = await asyncio.gather(*[fetch_bn(c) for c in batch])
+                        total_stored += await self._store_funding(exchange, results)
+                        if i + BATCH_SIZE < len(stale):
+                            await asyncio.sleep(BATCH_DELAY)
+            else:
+                # OKX / Bybit — use FundingRankService (no cooldown issue)
+                async def fetch_other(coin: str):
+                    async with sem:
+                        try:
+                            records = await svc._fetch_funding_for_exchange(
+                                exchange, coin, start_ms, now_ms
+                            )
+                            await asyncio.sleep(0.3)
+                            return (coin, records) if records else None
+                        except Exception:
+                            return None
 
-                async with async_session_factory() as db:
-                    for r in results:
-                        if r is None:
-                            failed += 1
-                            continue
-                        coin, records = r
-                        if not records:
-                            continue
-                        values = [
-                            {
-                                "exchange": exchange,
-                                "coin": coin,
-                                "funding_rate": rec["rate"],
-                                "funding_time": datetime.fromtimestamp(
-                                    rec["time_ms"] / 1000, tz=_UTC8
-                                ).replace(tzinfo=None),
-                            }
-                            for rec in records
-                        ]
-                        stmt = mysql_insert(FundingHistory).values(values)
-                        stmt = stmt.on_duplicate_key_update(
-                            funding_rate=stmt.inserted.funding_rate,
-                        )
-                        await db.execute(stmt)
-                        total_stored += len(values)
-                    await db.commit()
+                for i in range(0, len(stale), BATCH_SIZE):
+                    batch = stale[i:i + BATCH_SIZE]
+                    results = await asyncio.gather(*[fetch_other(c) for c in batch])
+                    total_stored += await self._store_funding(exchange, results)
+                    if i + BATCH_SIZE < len(stale):
+                        await asyncio.sleep(BATCH_DELAY)
 
-                progress = min(i + BATCH_SIZE, len(stale))
-                if progress % 50 == 0 or progress == len(stale):
-                    logger.info("Funding backfill [%s]: %d/%d (stored %d)",
-                                exchange, progress, len(stale), total_stored)
+            if total_stored > 0:
+                logger.info("Funding backfill [%s]: done — %d records", exchange, total_stored)
 
-                if i + BATCH_SIZE < len(stale):
-                    await asyncio.sleep(BATCH_DELAY)
-
-            logger.info("Funding backfill [%s]: done — %d records, %d failed",
-                        exchange, total_stored, failed)
+    async def _store_funding(self, exchange: str, results: list) -> int:
+        """Batch store funding results to DB."""
+        total = 0
+        async with async_session_factory() as db:
+            for r in results:
+                if r is None:
+                    continue
+                coin, records = r
+                if not records:
+                    continue
+                values = [
+                    {
+                        "exchange": exchange,
+                        "coin": coin,
+                        "funding_rate": rec["rate"],
+                        "funding_time": datetime.fromtimestamp(
+                            rec["time_ms"] / 1000, tz=_UTC8
+                        ).replace(tzinfo=None),
+                    }
+                    for rec in records
+                ]
+                stmt = mysql_insert(FundingHistory).values(values)
+                stmt = stmt.on_duplicate_key_update(funding_rate=stmt.inserted.funding_rate)
+                await db.execute(stmt)
+                total += len(values)
+            await db.commit()
+        return total
 
     async def _get_stale_funding_coins(self, exchange: str, coins: set[str]) -> list[str]:
-        """Find coins with stale or missing funding data."""
-        # Load settlement periods from FundingCap
         exchange_map = {"BN": "Binance", "OKX": "OKX", "BY": "Bybit"}
         cap_exchange = exchange_map.get(exchange, exchange)
 
@@ -352,7 +463,6 @@ class DataBackfillScheduler:
         except Exception:
             pass
 
-        # Get latest funding_time per coin
         try:
             async with async_session_factory() as db:
                 result = await db.execute(
@@ -379,26 +489,33 @@ class DataBackfillScheduler:
     # ==================================================================
 
     async def _get_bn_symbols(self) -> list[str]:
-        """Get Binance USDT perpetual symbols, with DB fallback."""
+        """Get Binance symbols — raw aiohttp with DB fallback."""
         try:
-            async with BinanceClient() as client:
-                info = await client.get_exchange_info()
-            if info:
-                return [
-                    s["symbol"] for s in info.get("symbols", [])
-                    if s.get("contractType") in ("PERPETUAL", "TRADIFI_PERPETUAL")
-                    and s.get("quoteAsset") == "USDT"
-                    and s.get("status") == "TRADING"
-                ]
+            timeout = aiohttp.ClientTimeout(total=10)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(f"{BN_API}/fapi/v1/exchangeInfo") as resp:
+                    if resp.status == 200:
+                        info = await resp.json()
+                        symbols = [
+                            s["symbol"] for s in info.get("symbols", [])
+                            if s.get("contractType") in ("PERPETUAL", "TRADIFI_PERPETUAL")
+                            and s.get("quoteAsset") == "USDT"
+                            and s.get("status") == "TRADING"
+                        ]
+                        if symbols:
+                            return symbols
         except Exception:
             pass
-        # Fallback
+        # DB fallback
         try:
             async with async_session_factory() as db:
                 result = await db.execute(select(PriceKline.symbol).distinct())
-                return [row[0] for row in result.all()]
+                symbols = [row[0] for row in result.all()]
+                if symbols:
+                    return symbols
         except Exception:
-            return []
+            pass
+        return []
 
 
 # Singleton
