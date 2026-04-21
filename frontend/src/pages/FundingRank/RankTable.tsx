@@ -63,6 +63,19 @@ export default function RankTable({ data, loading, onDiffClick, onWatchToggle }:
       ),
     },
     {
+      title: '资费差额',
+      dataIndex: 'total_diff',
+      key: 'total_diff',
+      width: 80,
+      sorter: (a, b) => a.total_diff - b.total_diff,
+      defaultSortOrder: 'descend',
+      render: (val: number, record: RankItem) => (
+        <span onClick={() => onDiffClick(record)} style={{ color: val >= 0 ? '#22AB94' : '#F23645', cursor: 'pointer' }}>
+          {val >= 0 ? '+' : ''}{val.toFixed(2)}%
+        </span>
+      ),
+    },
+    {
       title: '做多结算',
       key: 'long_count_period',
       width: 75,
@@ -76,19 +89,6 @@ export default function RankTable({ data, loading, onDiffClick, onWatchToggle }:
       width: 75,
       render: (_, r) => (
         <span>{r.short_settlement_count}次<span style={{ color: '#999' }}>/{r.short_settlement_period}h</span></span>
-      ),
-    },
-    {
-      title: '资费差额',
-      dataIndex: 'total_diff',
-      key: 'total_diff',
-      width: 80,
-      sorter: (a, b) => a.total_diff - b.total_diff,
-      defaultSortOrder: 'descend',
-      render: (val: number, record: RankItem) => (
-        <span onClick={() => onDiffClick(record)} style={{ color: val >= 0 ? '#22AB94' : '#F23645', cursor: 'pointer' }}>
-          {val >= 0 ? '+' : ''}{val.toFixed(2)}%
-        </span>
       ),
     },
     {
