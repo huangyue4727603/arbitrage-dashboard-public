@@ -334,12 +334,17 @@ class DataBackfillScheduler:
             if not self._running:
                 return
 
+            # Get coins — try API first, always fall back to DB
             try:
                 coins = await svc._get_exchange_coins(exchange)
-            except Exception as exc:
-                logger.error("Funding backfill [%s]: failed to get coins: %s", exchange, exc)
-                continue
-
+            except Exception:
+                coins = set()
+            if not coins:
+                # DB fallback — always available even when API is down
+                coins = await svc._get_exchange_coins_from_db(exchange)
+                if coins:
+                    logger.info("Funding backfill [%s]: using DB fallback (%d coins)",
+                                exchange, len(coins))
             if not coins:
                 continue
 
