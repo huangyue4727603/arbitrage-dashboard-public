@@ -257,28 +257,44 @@ export default function RankTable({ data, loading, onDiffClick, onWatchToggle }:
       footer={null}
       width={600}
     >
-      {indexDetail && (
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-          <thead>
-            <tr style={{ borderBottom: '2px solid #eee', textAlign: 'left' }}>
-              <th style={{ padding: '6px 8px' }}>交易所</th>
-              <th style={{ padding: '6px 8px' }}>做多方权重</th>
-              <th style={{ padding: '6px 8px' }}>做空方权重</th>
-              <th style={{ padding: '6px 8px' }}>共同</th>
-            </tr>
-          </thead>
-          <tbody>
-            {indexDetail.map((row, i) => (
-              <tr key={i} style={{ borderBottom: '1px solid #f0f0f0', backgroundColor: row.common ? '#f6ffed' : undefined }}>
-                <td style={{ padding: '5px 8px' }}>{row.exchange}</td>
-                <td style={{ padding: '5px 8px' }}>{row.long_weight ? (row.long_weight * 100).toFixed(2) + '%' : '—'}</td>
-                <td style={{ padding: '5px 8px' }}>{row.short_weight ? (row.short_weight * 100).toFixed(2) + '%' : '—'}</td>
-                <td style={{ padding: '5px 8px', color: row.common ? '#22AB94' : '#d9d9d9' }}>{row.common ? '✓' : '✗'}</td>
+      {indexDetail && (() => {
+        const commonTotal = indexDetail.reduce((sum, r) => sum + (r.common ? Math.min(r.long_weight, r.short_weight) : 0), 0);
+        return (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid #eee', textAlign: 'left' }}>
+                <th style={{ padding: '6px 8px' }}>交易所</th>
+                <th style={{ padding: '6px 8px' }}>做多方权重</th>
+                <th style={{ padding: '6px 8px' }}>做空方权重</th>
+                <th style={{ padding: '6px 8px' }}>共同权重</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+            </thead>
+            <tbody>
+              {indexDetail.map((row, i) => {
+                const commonWeight = row.common ? Math.min(row.long_weight, row.short_weight) : 0;
+                return (
+                  <tr key={i} style={{ borderBottom: '1px solid #f0f0f0', backgroundColor: row.common ? '#f6ffed' : undefined }}>
+                    <td style={{ padding: '5px 8px' }}>{row.exchange}</td>
+                    <td style={{ padding: '5px 8px' }}>{row.long_weight ? (row.long_weight * 100).toFixed(2) + '%' : '—'}</td>
+                    <td style={{ padding: '5px 8px' }}>{row.short_weight ? (row.short_weight * 100).toFixed(2) + '%' : '—'}</td>
+                    <td style={{ padding: '5px 8px', color: commonWeight > 0 ? '#22AB94' : '#d9d9d9' }}>
+                      {commonWeight > 0 ? (commonWeight * 100).toFixed(2) + '%' : '—'}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr style={{ borderTop: '2px solid #ddd', fontWeight: 600 }}>
+                <td style={{ padding: '6px 8px' }}>合计</td>
+                <td style={{ padding: '6px 8px' }}>{(indexDetail.reduce((s, r) => s + r.long_weight, 0) * 100).toFixed(2)}%</td>
+                <td style={{ padding: '6px 8px' }}>{(indexDetail.reduce((s, r) => s + r.short_weight, 0) * 100).toFixed(2)}%</td>
+                <td style={{ padding: '6px 8px', color: '#22AB94' }}>{(commonTotal * 100).toFixed(2)}%</td>
+              </tr>
+            </tfoot>
+          </table>
+        );
+      })()}
     </Modal>
     </>
   );
