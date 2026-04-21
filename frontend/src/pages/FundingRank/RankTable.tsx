@@ -8,11 +8,7 @@ interface RankTableProps {
   onDiffClick: (record: RankItem) => void;
 }
 
-const exchangeLabel: Record<string, string> = {
-  BN: 'Binance',
-  OKX: 'OKX',
-  BY: 'Bybit',
-};
+const exLabel: Record<string, string> = { BN: 'BN', OKX: 'OKX', BY: 'BY' };
 
 export default function RankTable({ data, loading, onDiffClick }: RankTableProps) {
   const columns: ColumnsType<RankItem> = [
@@ -20,83 +16,63 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
       title: '币种',
       dataIndex: 'coin',
       key: 'coin',
-      width: 75,
+      width: 72,
       fixed: 'left',
       render: (coin: string) => (
-        <a
-          href={`https://www.coinglass.com/tv/zh/Binance_${coin}USDT`}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
+        <a href={`https://www.coinglass.com/tv/zh/Binance_${coin}USDT`} target="_blank" rel="noopener noreferrer">
           {coin}
         </a>
       ),
     },
     {
-      title: '做多总资费/交易所',
+      title: '做多总资费',
       key: 'long_funding_ex',
-      width: 155,
-      render: (_, record) => (
-        <span style={{ color: record.long_total_funding >= 0 ? '#22AB94' : '#F23645' }}>
-          {record.long_total_funding >= 0 ? '+' : ''}
-          {record.long_total_funding.toFixed(3)}%
-          <span style={{ color: '#999', marginLeft: 4, fontSize: 12 }}>
-            {exchangeLabel[record.long_exchange] || record.long_exchange}
-          </span>
+      width: 120,
+      render: (_, r) => (
+        <span style={{ color: r.long_total_funding >= 0 ? '#22AB94' : '#F23645' }}>
+          {r.long_total_funding >= 0 ? '+' : ''}{r.long_total_funding.toFixed(2)}%
+          <span style={{ color: '#999', marginLeft: 3, fontSize: 11 }}>{exLabel[r.long_exchange] || r.long_exchange}</span>
         </span>
       ),
     },
     {
-      title: '做空总资费/交易所',
+      title: '做空总资费',
       key: 'short_funding_ex',
-      width: 155,
+      width: 120,
       sorter: (a, b) => a.short_total_funding - b.short_total_funding,
-      render: (_, record) => (
-        <span style={{ color: record.short_total_funding >= 0 ? '#22AB94' : '#F23645' }}>
-          {record.short_total_funding >= 0 ? '+' : ''}
-          {record.short_total_funding.toFixed(3)}%
-          <span style={{ color: '#999', marginLeft: 4, fontSize: 12 }}>
-            {exchangeLabel[record.short_exchange] || record.short_exchange}
-          </span>
+      render: (_, r) => (
+        <span style={{ color: r.short_total_funding >= 0 ? '#22AB94' : '#F23645' }}>
+          {r.short_total_funding >= 0 ? '+' : ''}{r.short_total_funding.toFixed(2)}%
+          <span style={{ color: '#999', marginLeft: 3, fontSize: 11 }}>{exLabel[r.short_exchange] || r.short_exchange}</span>
         </span>
       ),
     },
     {
       title: '做多结算',
       key: 'long_count_period',
-      width: 95,
-      render: (_, record) => (
-        <span>
-          {record.long_settlement_count}次
-          <span style={{ color: '#999', marginLeft: 4 }}>/{record.long_settlement_period}h</span>
-        </span>
+      width: 85,
+      render: (_, r) => (
+        <span>{r.long_settlement_count}<span style={{ color: '#999' }}>/{r.long_settlement_period}h</span></span>
       ),
     },
     {
       title: '做空结算',
       key: 'short_count_period',
-      width: 95,
-      render: (_, record) => (
-        <span>
-          {record.short_settlement_count}次
-          <span style={{ color: '#999', marginLeft: 4 }}>/{record.short_settlement_period}h</span>
-        </span>
+      width: 85,
+      render: (_, r) => (
+        <span>{r.short_settlement_count}<span style={{ color: '#999' }}>/{r.short_settlement_period}h</span></span>
       ),
     },
     {
-      title: '总资费差额',
+      title: '资费差额',
       dataIndex: 'total_diff',
       key: 'total_diff',
-      width: 100,
+      width: 90,
       sorter: (a, b) => a.total_diff - b.total_diff,
       defaultSortOrder: 'descend',
       render: (val: number, record: RankItem) => (
-        <span
-          onClick={() => onDiffClick(record)}
-          style={{ color: val >= 0 ? '#22AB94' : '#F23645', cursor: 'pointer' }}
-        >
-          {val >= 0 ? '+' : ''}
-          {val.toFixed(3)}%
+        <span onClick={() => onDiffClick(record)} style={{ color: val >= 0 ? '#22AB94' : '#F23645', cursor: 'pointer' }}>
+          {val >= 0 ? '+' : ''}{val.toFixed(3)}%
         </span>
       ),
     },
@@ -104,31 +80,23 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
       title: '1d',
       dataIndex: 'change_1d',
       key: 'change_1d',
-      width: 75,
+      width: 70,
       sorter: (a, b) => (a.change_1d ?? 0) - (b.change_1d ?? 0),
       render: (val?: number) =>
-        val !== undefined ? (
-          <span style={{ color: val >= 0 ? '#22AB94' : '#F23645' }}>
-            {val >= 0 ? '+' : ''}{val.toFixed(2)}%
-          </span>
-        ) : (
-          <span style={{ color: '#d9d9d9' }}>—</span>
-        ),
+        val !== undefined
+          ? <span style={{ color: val >= 0 ? '#22AB94' : '#F23645' }}>{val >= 0 ? '+' : ''}{val.toFixed(2)}%</span>
+          : <span style={{ color: '#d9d9d9' }}>—</span>,
     },
     {
       title: '3d',
       dataIndex: 'change_3d',
       key: 'change_3d',
-      width: 75,
+      width: 70,
       sorter: (a, b) => (a.change_3d ?? 0) - (b.change_3d ?? 0),
       render: (val?: number) =>
-        val !== undefined ? (
-          <span style={{ color: val >= 0 ? '#22AB94' : '#F23645' }}>
-            {val >= 0 ? '+' : ''}{val.toFixed(2)}%
-          </span>
-        ) : (
-          <span style={{ color: '#d9d9d9' }}>—</span>
-        ),
+        val !== undefined
+          ? <span style={{ color: val >= 0 ? '#22AB94' : '#F23645' }}>{val >= 0 ? '+' : ''}{val.toFixed(2)}%</span>
+          : <span style={{ color: '#d9d9d9' }}>—</span>,
     },
     {
       title: '开差',
@@ -137,14 +105,9 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
       width: 80,
       sorter: (a, b) => (a.current_spread ?? 0) - (b.current_spread ?? 0),
       render: (val?: number) =>
-        val !== undefined ? (
-          <span style={{ color: val >= 0 ? '#22AB94' : '#F23645' }}>
-            {val >= 0 ? '+' : ''}
-            {val.toFixed(4)}%
-          </span>
-        ) : (
-          '-'
-        ),
+        val !== undefined
+          ? <span style={{ color: val >= 0 ? '#22AB94' : '#F23645' }}>{val >= 0 ? '+' : ''}{val.toFixed(4)}%</span>
+          : <span style={{ color: '#d9d9d9' }}>-</span>,
     },
     {
       title: '基差',
@@ -153,115 +116,77 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
       width: 80,
       sorter: (a, b) => (a.current_basis ?? 0) - (b.current_basis ?? 0),
       render: (val?: number) =>
-        val !== undefined ? (
-          <span style={{ color: val >= 0 ? '#22AB94' : '#F23645' }}>
-            {val >= 0 ? '+' : ''}
-            {val.toFixed(4)}%
-          </span>
-        ) : (
-          '-'
-        ),
+        val !== undefined
+          ? <span style={{ color: val >= 0 ? '#22AB94' : '#F23645' }}>{val >= 0 ? '+' : ''}{val.toFixed(4)}%</span>
+          : <span style={{ color: '#d9d9d9' }}>-</span>,
     },
     {
       title: '持仓量',
       dataIndex: 'oi',
       key: 'oi',
-      width: 85,
+      width: 82,
       sorter: (a, b) => (a.oi ?? 0) - (b.oi ?? 0),
       render: (val?: number) =>
-        val ? (
-          <span>{(val / 1e6).toFixed(3)}m</span>
-        ) : (
-          <span style={{ color: '#d9d9d9' }}>—</span>
-        ),
+        val ? <span>{(val / 1e6).toFixed(3)}m</span> : <span style={{ color: '#d9d9d9' }}>—</span>,
     },
     {
       title: '多空比',
       dataIndex: 'lsr',
       key: 'lsr',
-      width: 75,
+      width: 70,
       sorter: (a, b) => (a.lsr ?? 0) - (b.lsr ?? 0),
       render: (val?: number) =>
-        val ? (
-          <span style={{ color: val < 1 ? '#22AB94' : undefined }}>
-            {val.toFixed(3)}
-          </span>
-        ) : (
-          <span style={{ color: '#d9d9d9' }}>—</span>
-        ),
+        val
+          ? <span style={{ color: val < 1 ? '#22AB94' : undefined }}>{val.toFixed(3)}</span>
+          : <span style={{ color: '#d9d9d9' }}>—</span>,
     },
     {
       title: 'bn_spot',
       dataIndex: 'bn_spot',
       key: 'bn_spot',
-      width: 80,
+      width: 65,
       filters: [
         { text: '有现货', value: true },
         { text: '无现货', value: false },
       ],
       onFilter: (value, record) => (record.bn_spot ?? false) === value,
       render: (val?: boolean) =>
-        val ? (
-          <span style={{ color: '#22AB94', fontSize: 16 }}>&#10003;</span>
-        ) : (
-          <span style={{ color: '#d9d9d9', fontSize: 14 }}>&#10007;</span>
-        ),
+        val
+          ? <span style={{ color: '#22AB94', fontSize: 15 }}>&#10003;</span>
+          : <span style={{ color: '#d9d9d9', fontSize: 13 }}>&#10007;</span>,
     },
     {
-      title: '趋势',
+      title: '价格趋势',
       key: 'trend',
-      width: 90,
-      render: (_, record) => {
-        const dots = [
-          { val: record.trend_daily, label: 'D' },
-          { val: record.trend_h4, label: '4H' },
-          { val: record.trend_h1, label: '1H' },
-          { val: record.trend_m15, label: '15m' },
-        ];
-        return (
-          <span style={{ display: 'flex', gap: 3, alignItems: 'center' }} title="日线 4H 1H 15m 多头排列">
-            {dots.map((d, i) => (
-              <span
-                key={i}
-                style={{
-                  display: 'inline-block',
-                  width: 12,
-                  height: 12,
-                  borderRadius: '50%',
-                  backgroundColor: d.val ? '#22AB94' : '#e0e0e0',
-                }}
-                title={`${d.label}: ${d.val ? '多头' : '—'}`}
-              />
-            ))}
-          </span>
-        );
-      },
+      width: 85,
+      render: (_, record) => (
+        <span style={{ display: 'flex', gap: 3 }} title="日线 4H 1H 15m">
+          {[record.trend_daily, record.trend_h4, record.trend_h1, record.trend_m15].map((v, i) => (
+            <span key={i} style={{
+              display: 'inline-block', width: 11, height: 11, borderRadius: '50%',
+              backgroundColor: v ? '#22AB94' : '#e0e0e0',
+            }} />
+          ))}
+        </span>
+      ),
     },
     {
       title: 'bn_alpha',
       dataIndex: 'bn_alpha',
       key: 'bn_alpha',
-      width: 80,
+      width: 75,
       sorter: (a, b) => (a.bn_alpha ?? 0) - (b.bn_alpha ?? 0),
       render: (val?: number) =>
-        val ? (
-          <span style={{ color: '#E6A700' }}>{(val * 100).toFixed(1)}%</span>
-        ) : (
-          <span style={{ color: '#d9d9d9' }}>—</span>
-        ),
+        val ? <span style={{ color: '#E6A700' }}>{(val * 100).toFixed(1)}%</span> : <span style={{ color: '#d9d9d9' }}>—</span>,
     },
     {
       title: 'bn_future',
       dataIndex: 'bn_future',
       key: 'bn_future',
-      width: 80,
+      width: 75,
       sorter: (a, b) => (a.bn_future ?? 0) - (b.bn_future ?? 0),
       render: (val?: number) =>
-        val ? (
-          <span style={{ color: '#E6A700' }}>{(val * 100).toFixed(1)}%</span>
-        ) : (
-          <span style={{ color: '#d9d9d9' }}>—</span>
-        ),
+        val ? <span style={{ color: '#E6A700' }}>{(val * 100).toFixed(1)}%</span> : <span style={{ color: '#d9d9d9' }}>—</span>,
     },
   ];
 
@@ -274,6 +199,7 @@ export default function RankTable({ data, loading, onDiffClick }: RankTableProps
       pagination={{ pageSize: 50, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
       size="small"
       scroll={{ x: 1500 }}
+      style={{ fontSize: 13 }}
     />
   );
 }
