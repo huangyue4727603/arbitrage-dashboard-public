@@ -98,6 +98,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Action log middleware
+from app.middleware.action_log import ActionLogMiddleware
+app.add_middleware(ActionLogMiddleware)
+
 # CORS middleware - allow all origins for local development
 app.add_middleware(
     CORSMiddleware,

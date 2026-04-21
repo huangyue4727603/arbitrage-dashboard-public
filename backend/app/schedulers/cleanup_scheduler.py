@@ -8,7 +8,7 @@ from sqlalchemy import delete, text
 
 from app.database import async_session_factory
 from app.models.alert_history import BasisAlertHistory, BasisAlertRecord
-from app.models.market_data import NewListing, PriceTrend, FundingHistory
+from app.models.market_data import NewListing, PriceTrend, FundingHistory, UserActionLog
 
 logger = logging.getLogger(__name__)
 
@@ -53,10 +53,16 @@ class CleanupScheduler:
                     delete(FundingHistory).where(FundingHistory.funding_time < cutoff_30d)
                 )
 
+                # 6. action_log: keep 3 days
+                cutoff_3d = now - timedelta(days=3)
+                r6 = await db.execute(
+                    delete(UserActionLog).where(UserActionLog.created_at < cutoff_3d)
+                )
+
                 await db.commit()
                 logger.info(
-                    "Cleanup done: alert_history=%d, alert_records=%d, new_listings=%d, price_trends=%d, funding_history=%d",
-                    r1.rowcount, r2.rowcount, r3.rowcount, r4.rowcount, r5.rowcount,
+                    "Cleanup done: alert_history=%d, alert_records=%d, new_listings=%d, price_trends=%d, funding_history=%d, action_log=%d",
+                    r1.rowcount, r2.rowcount, r3.rowcount, r4.rowcount, r5.rowcount, r6.rowcount,
                 )
             except Exception as exc:
                 logger.error("Cleanup failed: %s", exc)

@@ -229,6 +229,32 @@ class UserWatchlist(Base):
     )
 
 
+class UserActionLog(Base):
+    """User action/API request log."""
+    __tablename__ = "arb_user_action_log"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    method: Mapped[str] = mapped_column(String(10), nullable=False)
+    path: Mapped[str] = mapped_column(String(500), nullable=False)
+    query: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    body: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
+    status_code: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    ip: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    user_agent: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    duration_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+    )
+
+    __table_args__ = (
+        Index("ix_action_log_user", "user_id"),
+        Index("ix_action_log_created", "created_at"),
+        Index("ix_action_log_path", "path"),
+    )
+
+
 class SpotExchangeMapping(Base):
     """Mapping table to normalize spot_exchange names in index constituents."""
     __tablename__ = "arb_spot_exchange_mapping"
