@@ -142,7 +142,7 @@ export default function RankTable({ data, loading, onDiffClick, onWatchToggle }:
       width: 82,
       sorter: (a, b) => (a.oi ?? 0) - (b.oi ?? 0),
       render: (val?: number) =>
-        val ? <span>{(val / 1e6).toFixed(2)}m</span> : <span style={{ color: '#d9d9d9' }}>—</span>,
+        val ? <span style={{ color: val < 3e6 ? '#F23645' : val > 10e6 ? '#22AB94' : undefined }}>{(val / 1e6).toFixed(2)}m</span> : <span style={{ color: '#d9d9d9' }}>—</span>,
     },
     {
       title: '多空比',
