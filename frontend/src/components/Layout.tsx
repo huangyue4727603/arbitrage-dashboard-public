@@ -17,7 +17,6 @@ import NewListing from '../pages/NewListing';
 import FundingBreak from '../pages/FundingBreak';
 import BasisMonitor from '../pages/BasisMonitor';
 import AlertConfig from '../pages/AlertConfig';
-import PremiumFilter from '../pages/PremiumFilter';
 import Calculator from '../pages/FundingRank/Calculator';
 
 const { Header, Content } = AntLayout;
@@ -26,7 +25,6 @@ const tabItems = [
   { key: 'fundingRank', label: '资费排行', children: <FundingRank /> },
   { key: 'newListing', label: '新上线', children: <NewListing /> },
   { key: 'fundingBreak', label: '资费突破', children: <FundingBreak /> },
-  { key: 'premiumFilter', label: '大额基差', children: <PremiumFilter /> },
   { key: 'basisMonitor', label: '基差监控', children: <BasisMonitor /> },
   { key: 'alertConfig', label: '预警配置', children: <AlertConfig /> },
 ];
