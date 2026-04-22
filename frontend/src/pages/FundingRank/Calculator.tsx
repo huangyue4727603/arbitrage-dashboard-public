@@ -95,18 +95,18 @@ export default function Calculator({ open, onClose, initialValues }: CalculatorP
   const periodColumns: ColumnsType<Record<string, any>> = [
     { title: '结算时间', dataIndex: 'time', key: 'time', width: 160,
       render: (val: number) => dayjs(val).format('YYYY-MM-DD HH:mm') },
-    { title: `${l1}资费`, dataIndex: 'long1_funding', key: 'long1', width: 100, render: renderVal },
-    ...(hasLong2 ? [{ title: `${l2}资费`, dataIndex: 'long2_funding', key: 'long2', width: 100, render: renderVal }] : []),
-    { title: `${s}资费`, dataIndex: 'short_funding', key: 'short', width: 100, render: renderVal },
+    { title: `▲${l1}资费`, dataIndex: 'long1_funding', key: 'long1', width: 100, render: renderVal },
+    ...(hasLong2 ? [{ title: `▲${l2}资费`, dataIndex: 'long2_funding', key: 'long2', width: 100, render: renderVal }] : []),
+    { title: `▼${s}资费`, dataIndex: 'short_funding', key: 'short', width: 100, render: renderVal },
     { title: `${l1}_${s}差额`, dataIndex: 'diff1', key: 'diff1', width: 110, render: renderVal },
     ...(hasLong2 ? [{ title: `${l2}_${s}差额`, dataIndex: 'diff2', key: 'diff2', width: 110, render: renderVal }] : []),
   ];
 
   const dayColumns: ColumnsType<Record<string, any>> = [
     { title: '日期', dataIndex: 'date', key: 'date', width: 110 },
-    { title: `${l1}做多合计`, dataIndex: 'long1_total', key: 'long1', width: 110, render: renderVal },
-    ...(hasLong2 ? [{ title: `${l2}做多合计`, dataIndex: 'long2_total', key: 'long2', width: 110, render: renderVal }] : []),
-    { title: `${s}做空合计`, dataIndex: 'short_total', key: 'short', width: 110, render: renderVal },
+    { title: `▲${l1}做多`, dataIndex: 'long1_total', key: 'long1', width: 110, render: renderVal },
+    ...(hasLong2 ? [{ title: `▲${l2}做多`, dataIndex: 'long2_total', key: 'long2', width: 110, render: renderVal }] : []),
+    { title: `▼${s}做空`, dataIndex: 'short_total', key: 'short', width: 110, render: renderVal },
     { title: `${l1}_${s}差额`, dataIndex: 'diff1', key: 'diff1', width: 110, render: renderVal },
     ...(hasLong2 ? [{ title: `${l2}_${s}差额`, dataIndex: 'diff2', key: 'diff2', width: 110, render: renderVal }] : []),
   ];
