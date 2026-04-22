@@ -59,13 +59,12 @@ export interface DaySummary {
 }
 
 export interface CalculatorResult {
-  per_period: FundingDetail[];
-  per_day: DaySummary[];
-  summary: {
-    long_total: number;
-    short_total: number;
-    total_diff: number;
-  };
+  per_period: Record<string, any>[];
+  per_day: Record<string, any>[];
+  summary: Record<string, number>;
+  long_exchange: string;
+  short_exchange: string;
+  long_exchange2?: string | null;
 }
 
 export interface RankingsResponse {
@@ -191,14 +190,17 @@ export const fundingApi = {
     shortExchange: string,
     start?: number,
     end?: number,
+    longExchange2?: string,
   ): Promise<{ data: CalculatorResult }> => {
-    const res = await client.post('/api/funding-rank/calculator', {
+    const body: Record<string, any> = {
       coin,
       long_exchange: longExchange,
       short_exchange: shortExchange,
       start,
       end,
-    });
+    };
+    if (longExchange2) body.long_exchange2 = longExchange2;
+    const res = await client.post('/api/funding-rank/calculator', body);
     return res.data;
   },
 };

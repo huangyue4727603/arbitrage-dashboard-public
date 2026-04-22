@@ -60,6 +60,7 @@ async def log_action(body: ActionLogBody, user_id: Optional[int] = Depends(get_o
 class CalculatorRequest(BaseModel):
     coin: str
     long_exchange: str
+    long_exchange2: Optional[str] = None  # second long exchange (optional)
     short_exchange: str
     start: Optional[int] = None
     end: Optional[int] = None
@@ -433,8 +434,11 @@ async def calculate(body: CalculatorRequest):
     valid_exchanges = {"BN", "OKX", "BY"}
     if body.long_exchange not in valid_exchanges or body.short_exchange not in valid_exchanges:
         raise HTTPException(status_code=400, detail="Invalid exchange. Use BN, OKX, or BY")
+    if body.long_exchange2 and body.long_exchange2 not in valid_exchanges:
+        raise HTTPException(status_code=400, detail="Invalid exchange. Use BN, OKX, or BY")
 
-    result = await service.calculate_statistics(
-        body.coin.upper(), body.long_exchange, body.short_exchange, start, end
+    result = await service.calculate_statistics_multi(
+        body.coin.upper(), body.long_exchange, body.short_exchange, start, end,
+        long_exchange2=body.long_exchange2,
     )
     return {"data": result}

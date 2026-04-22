@@ -421,43 +421,109 @@ class FundingRankService:
         self, coin: str, long_exchange: str, short_exchange: str,
         start_time: int, end_time: int
     ) -> dict:
-        """Funding calculator tool - reads from DB."""
-        details = await self.get_funding_detail(
+        """Funding calculator tool - reads from DB (single long exchange)."""
+        return await self.calculate_statistics_multi(
             coin, long_exchange, short_exchange, start_time, end_time
         )
 
+    async def _get_funding_map(
+        self, coin: str, exchange: str, start_dt: datetime, end_dt: datetime
+    ) -> dict[int, float]:
+        """Get {time_ms: rate} for one exchange+coin from DB."""
+        async with async_session_factory() as db:
+            result = await db.execute(
+                select(FundingHistory)
+                .where(FundingHistory.exchange == exchange)
+                .where(FundingHistory.coin == coin)
+                .where(FundingHistory.funding_time >= start_dt)
+                .where(FundingHistory.funding_time <= end_dt)
+            )
+            return {self._dt_to_ms(r.funding_time): r.funding_rate for r in result.scalars().all()}
+
+    async def calculate_statistics_multi(
+        self, coin: str, long_exchange: str, short_exchange: str,
+        start_time: int, end_time: int,
+        long_exchange2: Optional[str] = None,
+    ) -> dict:
+        """Funding calculator with optional second long exchange."""
+        start_dt = self._ms_to_dt(start_time)
+        end_dt = self._ms_to_dt(end_time)
+
+        long1_map = await self._get_funding_map(coin, long_exchange, start_dt, end_dt)
+        short_map = await self._get_funding_map(coin, short_exchange, start_dt, end_dt)
+        long2_map = await self._get_funding_map(coin, long_exchange2, start_dt, end_dt) if long_exchange2 else {}
+
+        has_long2 = bool(long_exchange2 and long2_map)
+        all_times = sorted(set(long1_map.keys()) | set(short_map.keys()) | set(long2_map.keys()), reverse=True)
+
+        # Per-period details
+        per_period = []
+        for t in all_times:
+            l1 = long1_map.get(t)
+            l2 = long2_map.get(t) if has_long2 else None
+            s = short_map.get(t)
+            long1_val = round(-l1 * 100, 3) if l1 is not None else None
+            long2_val = round(-l2 * 100, 3) if l2 is not None else None
+            short_val = round(s * 100, 3) if s is not None else None
+            diff1 = round((((-l1) if l1 is not None else 0) + (s if s is not None else 0)) * 100, 3)
+            diff2 = round((((-l2) if l2 is not None else 0) + (s if s is not None else 0)) * 100, 3) if has_long2 else None
+
+            dt = datetime.fromtimestamp(t / 1000, tz=_UTC8)
+            item: dict = {
+                "time": t,
+                "time_str": dt.strftime("%Y-%m-%d %H:%M:%S"),
+                "long1_funding": long1_val,
+                "short_funding": short_val,
+                "diff1": diff1,
+            }
+            if has_long2:
+                item["long2_funding"] = long2_val
+                item["diff2"] = diff2
+            per_period.append(item)
+
+        # Per-day summary
         daily: dict[str, dict[str, float]] = defaultdict(
-            lambda: {"long_total": 0.0, "short_total": 0.0, "diff": 0.0}
+            lambda: {"long1": 0.0, "long2": 0.0, "short": 0.0, "diff1": 0.0, "diff2": 0.0}
         )
-        for item in details:
+        for item in per_period:
             dt = datetime.fromtimestamp(item["time"] / 1000, tz=_UTC8)
             date_str = dt.strftime("%Y-%m-%d")
-            daily[date_str]["long_total"] += item["long_funding"] or 0.0
-            daily[date_str]["short_total"] += item["short_funding"] or 0.0
-            daily[date_str]["diff"] += item["diff"] or 0.0
+            daily[date_str]["long1"] += item["long1_funding"] or 0.0
+            daily[date_str]["short"] += item["short_funding"] or 0.0
+            daily[date_str]["diff1"] += item["diff1"] or 0.0
+            if has_long2:
+                daily[date_str]["long2"] += item.get("long2_funding") or 0.0
+                daily[date_str]["diff2"] += item.get("diff2") or 0.0
 
         per_day = []
         for date_str in sorted(daily.keys()):
             d = daily[date_str]
-            per_day.append({
+            row: dict = {
                 "date": date_str,
-                "long_total": round(d["long_total"], 3),
-                "short_total": round(d["short_total"], 3),
-                "diff": round(d["diff"], 3),
-            })
+                "long1_total": round(d["long1"], 3),
+                "short_total": round(d["short"], 3),
+                "diff1": round(d["diff1"], 3),
+            }
+            if has_long2:
+                row["long2_total"] = round(d["long2"], 3)
+                row["diff2"] = round(d["diff2"], 3)
+            per_day.append(row)
 
-        long_sum = sum(item["long_funding"] or 0.0 for item in details)
-        short_sum = sum(item["short_funding"] or 0.0 for item in details)
-        total_diff = sum(item["diff"] or 0.0 for item in details)
-
-        summary = {
-            "long_total": round(long_sum, 3),
-            "short_total": round(short_sum, 3),
-            "total_diff": round(total_diff, 3),
+        # Summary
+        summary: dict = {
+            "long1_total": round(sum(item["long1_funding"] or 0.0 for item in per_period), 3),
+            "short_total": round(sum(item["short_funding"] or 0.0 for item in per_period), 3),
+            "diff1": round(sum(item["diff1"] or 0.0 for item in per_period), 3),
         }
+        if has_long2:
+            summary["long2_total"] = round(sum(item.get("long2_funding") or 0.0 for item in per_period), 3)
+            summary["diff2"] = round(sum(item.get("diff2") or 0.0 for item in per_period), 3)
 
         return {
-            "per_period": details,
+            "per_period": per_period,
             "per_day": per_day,
             "summary": summary,
+            "long_exchange": long_exchange,
+            "short_exchange": short_exchange,
+            "long_exchange2": long_exchange2 if has_long2 else None,
         }

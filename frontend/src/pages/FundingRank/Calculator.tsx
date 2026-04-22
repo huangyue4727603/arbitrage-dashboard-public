@@ -3,7 +3,7 @@ import { Modal, Form, Select, DatePicker, Button, Table, Tabs, message } from 'a
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
-import { fundingApi, type FundingDetail, type DaySummary, type CalculatorResult } from '../../api/funding';
+import { fundingApi, type CalculatorResult } from '../../api/funding';
 
 const { RangePicker } = DatePicker;
 
@@ -21,10 +21,19 @@ interface CalculatorProps {
 }
 
 const exchangeOptions = [
-  { label: 'Binance (BN)', value: 'BN' },
+  { label: 'BN', value: 'BN' },
   { label: 'OKX', value: 'OKX' },
-  { label: 'Bybit (BY)', value: 'BY' },
+  { label: 'BY', value: 'BY' },
 ];
+
+const exLabel: Record<string, string> = { BN: 'BN', OKX: 'OKX', BY: 'BY' };
+
+const renderVal = (val: number | null | undefined) =>
+  val !== null && val !== undefined ? (
+    <span style={{ color: val >= 0 ? '#22AB94' : '#F23645' }}>
+      {val >= 0 ? '+' : ''}{val.toFixed(3)}%
+    </span>
+  ) : <span style={{ color: '#d9d9d9' }}>—</span>;
 
 export default function Calculator({ open, onClose, initialValues }: CalculatorProps) {
   const [form] = Form.useForm();
@@ -46,17 +55,14 @@ export default function Calculator({ open, onClose, initialValues }: CalculatorP
     try {
       const values = await form.validateFields();
       setLoading(true);
-
       const [startTime, endTime] = values.timeRange as [Dayjs, Dayjs];
-      const start = startTime.valueOf();
-      const end = endTime.valueOf();
-
       const res = await fundingApi.calculate(
         values.coin.toUpperCase(),
         values.longExchange,
         values.shortExchange,
-        start,
-        end,
+        startTime.valueOf(),
+        endTime.valueOf(),
+        values.longExchange2 || undefined,
       );
       setResult(res.data);
     } catch (err: any) {
@@ -67,7 +73,6 @@ export default function Calculator({ open, onClose, initialValues }: CalculatorP
     }
   };
 
-  // Auto-calculate when opened with initialValues from diff click
   useEffect(() => {
     if (open && initialValues && !autoTriggered) {
       form.setFieldsValue({
@@ -81,95 +86,41 @@ export default function Calculator({ open, onClose, initialValues }: CalculatorP
     }
   }, [open, initialValues, autoTriggered]);
 
-  const periodColumns: ColumnsType<FundingDetail> = [
-    {
-      title: '结算时间',
-      dataIndex: 'time',
-      key: 'time',
-      width: 180,
-      render: (val: number) => dayjs(val).format('YYYY-MM-DD HH:mm:ss'),
-    },
-    {
-      title: '做多方资费',
-      dataIndex: 'long_funding',
-      key: 'long_funding',
-      width: 120,
-      render: (val: number | null) =>
-        val === null ? (
-          <span style={{ color: '#d9d9d9' }}>—</span>
-        ) : (
-          <span style={{ color: val >= 0 ? '#22AB94' : '#F23645' }}>
-            {val >= 0 ? '+' : ''}{val.toFixed(3)}%
-          </span>
-        ),
-    },
-    {
-      title: '做空方资费',
-      dataIndex: 'short_funding',
-      key: 'short_funding',
-      width: 120,
-      render: (val: number | null) =>
-        val === null ? (
-          <span style={{ color: '#d9d9d9' }}>—</span>
-        ) : (
-          <span style={{ color: val >= 0 ? '#22AB94' : '#F23645' }}>
-            {val >= 0 ? '+' : ''}{val.toFixed(3)}%
-          </span>
-        ),
-    },
-    {
-      title: '差额',
-      dataIndex: 'diff',
-      key: 'diff',
-      width: 100,
-      render: (val: number) => (
-        <span style={{ color: val >= 0 ? '#22AB94' : '#F23645' }}>
-          {val >= 0 ? '+' : ''}{val.toFixed(3)}%
-        </span>
-      ),
-    },
+  // Dynamic columns based on result
+  const hasLong2 = !!(result?.long_exchange2);
+  const l1 = exLabel[result?.long_exchange || ''] || result?.long_exchange || '做多1';
+  const l2 = exLabel[result?.long_exchange2 || ''] || result?.long_exchange2 || '做多2';
+  const s = exLabel[result?.short_exchange || ''] || result?.short_exchange || '做空';
+
+  const periodColumns: ColumnsType<Record<string, any>> = [
+    { title: '结算时间', dataIndex: 'time', key: 'time', width: 160,
+      render: (val: number) => dayjs(val).format('YYYY-MM-DD HH:mm') },
+    { title: `${l1}资费`, dataIndex: 'long1_funding', key: 'long1', width: 100, render: renderVal },
+    ...(hasLong2 ? [{ title: `${l2}资费`, dataIndex: 'long2_funding', key: 'long2', width: 100, render: renderVal }] : []),
+    { title: `${s}资费`, dataIndex: 'short_funding', key: 'short', width: 100, render: renderVal },
+    { title: `${l1}_${s}差额`, dataIndex: 'diff1', key: 'diff1', width: 110, render: renderVal },
+    ...(hasLong2 ? [{ title: `${l2}_${s}差额`, dataIndex: 'diff2', key: 'diff2', width: 110, render: renderVal }] : []),
   ];
 
-  const renderFundingValue = (val: number) => (
-    <span style={{ color: val >= 0 ? '#22AB94' : '#F23645' }}>
-      {val >= 0 ? '+' : ''}{val.toFixed(3)}%
-    </span>
-  );
-
-  const dayColumns: ColumnsType<DaySummary> = [
-    { title: '日期', dataIndex: 'date', key: 'date', width: 120 },
-    {
-      title: '做多方合计',
-      dataIndex: 'long_total',
-      key: 'long_total',
-      width: 120,
-      render: (val: number) => renderFundingValue(val),
-    },
-    {
-      title: '做空方合计',
-      dataIndex: 'short_total',
-      key: 'short_total',
-      width: 120,
-      render: (val: number) => renderFundingValue(val),
-    },
-    {
-      title: '差额',
-      dataIndex: 'diff',
-      key: 'diff',
-      width: 100,
-      render: (val: number) => renderFundingValue(val),
-    },
+  const dayColumns: ColumnsType<Record<string, any>> = [
+    { title: '日期', dataIndex: 'date', key: 'date', width: 110 },
+    { title: `${l1}做多合计`, dataIndex: 'long1_total', key: 'long1', width: 110, render: renderVal },
+    ...(hasLong2 ? [{ title: `${l2}做多合计`, dataIndex: 'long2_total', key: 'long2', width: 110, render: renderVal }] : []),
+    { title: `${s}做空合计`, dataIndex: 'short_total', key: 'short', width: 110, render: renderVal },
+    { title: `${l1}_${s}差额`, dataIndex: 'diff1', key: 'diff1', width: 110, render: renderVal },
+    ...(hasLong2 ? [{ title: `${l2}_${s}差额`, dataIndex: 'diff2', key: 'diff2', width: 110, render: renderVal }] : []),
   ];
 
-  // Append summary row to per_day data
   const dayDataWithSummary = result
     ? [
         ...result.per_day,
         {
           date: '总计',
-          long_total: result.summary.long_total,
+          long1_total: result.summary.long1_total,
+          long2_total: result.summary.long2_total,
           short_total: result.summary.short_total,
-          diff: result.summary.total_diff,
+          diff1: result.summary.diff1,
+          diff2: result.summary.diff2,
         },
       ]
     : [];
@@ -180,7 +131,7 @@ export default function Calculator({ open, onClose, initialValues }: CalculatorP
           key: 'day',
           label: '每日汇总',
           children: (
-            <Table<DaySummary>
+            <Table
               columns={dayColumns}
               dataSource={dayDataWithSummary}
               rowKey="date"
@@ -195,7 +146,7 @@ export default function Calculator({ open, onClose, initialValues }: CalculatorP
           key: 'period',
           label: '每期明细',
           children: (
-            <Table<FundingDetail>
+            <Table
               columns={periodColumns}
               dataSource={result.per_period}
               rowKey="time"
@@ -212,66 +163,39 @@ export default function Calculator({ open, onClose, initialValues }: CalculatorP
     <Modal
       title="资费计算器"
       open={open}
-      onCancel={() => {
-        onClose();
-        setResult(null);
-        form.resetFields();
-      }}
+      onCancel={() => { onClose(); setResult(null); form.resetFields(); }}
       footer={null}
-      width={900}
+      width={hasLong2 ? 1000 : 900}
       destroyOnClose
     >
       <style>{`.summary-row td { font-weight: bold !important; background: #fafafa !important; }`}</style>
       <Form form={form} layout="inline" style={{ marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
-        <Form.Item name="coin" label="币种" rules={[{ required: true, message: '请选择币种' }]}>
-          <Select
-            showSearch
-            options={coins}
-            placeholder="搜索币种"
-            style={{ width: 140 }}
-            filterOption={(input, option) =>
-              (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-            }
-          />
+        <Form.Item name="coin" label="币种" rules={[{ required: true, message: '请选择' }]}>
+          <Select showSearch options={coins} placeholder="搜索" style={{ width: 120 }}
+            filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())} />
         </Form.Item>
-        <Form.Item
-          name="longExchange"
-          label="做多交易所"
-          rules={[{ required: true, message: '请选择' }]}
-        >
-          <Select options={exchangeOptions} style={{ width: 150 }} placeholder="选择交易所" />
+        <Form.Item name="longExchange" label="做多交易所1" rules={[{ required: true, message: '请选择' }]}>
+          <Select options={exchangeOptions} style={{ width: 100 }} placeholder="选择" />
         </Form.Item>
-        <Form.Item
-          name="shortExchange"
-          label="做空交易所"
-          rules={[{ required: true, message: '请选择' }]}
-        >
-          <Select options={exchangeOptions} style={{ width: 150 }} placeholder="选择交易所" />
+        <Form.Item name="longExchange2" label="做多交易所2">
+          <Select options={exchangeOptions} style={{ width: 100 }} placeholder="可选" allowClear />
         </Form.Item>
-        <Form.Item
-          name="timeRange"
-          label="时间范围"
-          rules={[{ required: true, message: '请选择时间范围' }]}
-        >
-          <RangePicker
-            showTime={{ format: 'HH:00' }}
-            format="YYYY-MM-DD HH:00"
+        <Form.Item name="shortExchange" label="做空交易所" rules={[{ required: true, message: '请选择' }]}>
+          <Select options={exchangeOptions} style={{ width: 100 }} placeholder="选择" />
+        </Form.Item>
+        <Form.Item name="timeRange" label="时间" rules={[{ required: true, message: '请选择' }]}>
+          <RangePicker showTime={{ format: 'HH:00' }} format="YYYY-MM-DD HH:00"
             presets={[
-              { label: '最近1天', value: [dayjs().subtract(1, 'day'), dayjs()] },
-              { label: '最近2天', value: [dayjs().subtract(2, 'day'), dayjs()] },
-              { label: '最近3天', value: [dayjs().subtract(3, 'day'), dayjs()] },
-              { label: '最近7天', value: [dayjs().subtract(7, 'day'), dayjs()] },
-              { label: '最近30天', value: [dayjs().subtract(30, 'day'), dayjs()] },
-            ]}
-          />
+              { label: '1天', value: [dayjs().subtract(1, 'day'), dayjs()] },
+              { label: '3天', value: [dayjs().subtract(3, 'day'), dayjs()] },
+              { label: '7天', value: [dayjs().subtract(7, 'day'), dayjs()] },
+              { label: '30天', value: [dayjs().subtract(30, 'day'), dayjs()] },
+            ]} />
         </Form.Item>
         <Form.Item>
-          <Button type="primary" onClick={handleCalculate} loading={loading}>
-            计算
-          </Button>
+          <Button type="primary" onClick={handleCalculate} loading={loading}>计算</Button>
         </Form.Item>
       </Form>
-
       {result && <Tabs items={resultTabs} />}
     </Modal>
   );
